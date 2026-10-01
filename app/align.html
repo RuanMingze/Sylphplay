@@ -1,0 +1,190 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline'; font-src 'self' data:; img-src 'self' data:" />
+  <title>强制对齐</title>
+  <link rel="stylesheet" href="../assets/fontawesome/css/all.min.css" />
+  <link rel="stylesheet" href="styles.css" />
+  <style>
+    body { user-select: none; }
+    /* 标题栏（无边框窗口，需自带拖动区与窗口按钮） */
+    #bar {
+      display: flex; align-items: center; gap: 10px;
+      padding: 8px 12px; flex: 0 0 auto;
+      background: var(--bg-elev); border-bottom: 1px solid var(--border);
+      -webkit-app-region: drag;
+    }
+    #bar .title { font-weight: 600; font-size: 14px; }
+    #bar .spacer { flex: 1; }
+    #bar .wc-btn { -webkit-app-region: no-drag; }
+    .wc-btn {
+      width: 30px; height: 26px; border: none; border-radius: 6px;
+      background: transparent; color: var(--text-dim);
+      display: inline-flex; align-items: center; justify-content: center;
+    }
+    .wc-btn:hover { background: var(--surface-2); color: var(--text); }
+    .wc-btn.wc-close:hover { background: #d94b3a; color: #fff; }
+    .wc-btn svg { width: 14px; height: 14px; stroke: currentColor; stroke-width: 1.4; fill: none; }
+
+    /* 主体两栏 */
+    #main { flex: 1 1 auto; display: flex; gap: 12px; padding: 12px; min-height: 0; }
+    #left { width: 380px; flex: 0 0 auto; display: flex; flex-direction: column; gap: 10px; overflow: auto; }
+    #right { flex: 1 1 auto; display: flex; flex-direction: column; gap: 10px; min-width: 0; }
+
+    .card { background: var(--bg-panel); border: 1px solid var(--border); border-radius: 10px; padding: 12px; }
+    .card h3 { font-size: 13px; font-weight: 600; color: var(--text-dim); margin-bottom: 10px; }
+    .row { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
+    .row:last-child { margin-bottom: 0; }
+    .path {
+      flex: 1 1 auto; min-width: 0; font-size: 12px; color: var(--text-dim);
+      background: var(--surface); border: 1px solid var(--border); border-radius: 6px;
+      padding: 6px 8px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+      direction: rtl; text-align: left;
+    }
+    .path.set { color: var(--text); }
+    label.field { font-size: 12px; color: var(--text-dim); width: 62px; flex: 0 0 auto; }
+    select {
+      flex: 1 1 auto; background: var(--surface); color: var(--text);
+      border: 1px solid var(--border); border-radius: 6px; padding: 5px 6px; font-size: 12px; font-family: inherit;
+    }
+    .chk { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--text-dim); cursor: pointer; }
+    .chk input { accent-color: var(--accent); }
+
+    #actions { display: flex; gap: 8px; flex-wrap: wrap; }
+    .btn[disabled] { opacity: .45; cursor: not-allowed; }
+
+    /* 进度：批量用实际完成比例，单文件用不确定动画（不假装进度） */
+    #bar-wrap { height: 6px; border-radius: 4px; background: var(--surface); overflow: hidden; margin-top: 10px; }
+    #bar-inner { height: 100%; width: 0; background: var(--accent); border-radius: 4px; transition: width .2s ease; }
+    #bar-wrap.indet #bar-inner { width: 35%; animation: slide 1.1s ease-in-out infinite; }
+    @keyframes slide { 0% { margin-left: -35%; } 100% { margin-left: 100%; } }
+    #status { font-size: 12px; color: var(--text-dim); margin-top: 8px; min-height: 16px; word-break: break-all; }
+    #tick { font-size: 11px; color: var(--text-faint); margin-top: 4px; min-height: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+    #result-wrap { flex: 1 1 auto; display: flex; flex-direction: column; min-height: 0; }
+    #result, #log {
+      flex: 1 1 auto; margin: 0; overflow: auto; user-select: text;
+      background: var(--surface); border: 1px solid var(--border); border-radius: 8px;
+      padding: 10px; font-size: 12px; line-height: 1.55; color: var(--text);
+      font-family: Consolas, "Cascadia Mono", monospace; white-space: pre-wrap; word-break: break-all;
+    }
+    #log-card { flex: 0 0 34%; display: none; flex-direction: column; min-height: 0; }
+    #log-card.show { display: flex; }
+    #log { font-size: 11px; color: var(--text-dim); }
+    .it-ok { color: var(--accent-2); }
+    .it-skip { color: var(--text-faint); }
+    .it-fail { color: #e06a55; }
+    dialog { border: 1px solid var(--border); border-radius: 10px; background: var(--bg-elev); color: var(--text); }
+    dialog::backdrop { background: rgba(0, 0, 0, .5); }
+    dialog .card { border: none; background: transparent; padding: 0; }
+    .save-dlg { padding: 16px; min-width: 340px; }
+    .save-dlg p { font-size: 13px; margin-bottom: 12px; }
+    .save-dlg .btn { display: block; width: 100%; margin-bottom: 8px; }
+  </style>
+</head>
+<body>
+  <!-- 标题栏 -->
+  <div id="bar">
+    <i class="fa-solid fa-wand-magic-sparkles" style="color: var(--accent)"></i>
+    <span class="title">强制对齐</span>
+    <span class="spacer"></span>
+    <button class="wc-btn" id="wc-min" title="最小化" aria-label="最小化">
+      <svg viewBox="0 0 16 16"><line x1="3" y1="8" x2="13" y2="8" /></svg>
+    </button>
+    <button class="wc-btn wc-close" id="wc-close" title="关闭" aria-label="关闭">
+      <svg viewBox="0 0 16 16"><line x1="4" y1="4" x2="12" y2="12" /><line x1="12" y1="4" x2="4" y2="12" /></svg>
+    </button>
+  </div>
+
+  <div id="main">
+    <!-- 左栏：输入与选项 -->
+    <div id="left">
+      <div class="card">
+        <h3>单文件</h3>
+        <div class="row">
+          <span class="path" id="path-audio">未选择音频</span>
+          <button class="btn sm" id="pick-audio">选择音频</button>
+        </div>
+        <div class="row">
+          <span class="path" id="path-lrc">未选择歌词</span>
+          <button class="btn sm" id="pick-lrc">选择歌词</button>
+        </div>
+      </div>
+
+      <div class="card">
+        <h3>批量（文件夹）</h3>
+        <div class="row">
+          <span class="path" id="path-folder">未选择文件夹</span>
+          <button class="btn sm" id="pick-folder">选择文件夹</button>
+        </div>
+        <div class="row">
+          <label class="chk"><input type="checkbox" id="opt-recursive" checked /> 递归子文件夹</label>
+        </div>
+      </div>
+
+      <div class="card">
+        <h3>选项</h3>
+        <div class="row">
+          <label class="field" for="opt-lang">语言</label>
+          <select id="opt-lang">
+            <option>自动检测</option>
+            <option selected>中文 (zh)</option>
+            <option>英语 (en)</option>
+            <option>日语 (ja)</option>
+            <option>韩语 (ko)</option>
+          </select>
+        </div>
+        <div class="row">
+          <label class="field" for="opt-format">输出格式</label>
+          <select id="opt-format">
+            <option selected>增强(逐字)</option>
+            <option>简单(逐行)</option>
+          </select>
+        </div>
+        <div class="row">
+          <label class="chk"><input type="checkbox" id="opt-parallel" /> 并行处理（吃满 CPU，可能卡顿）</label>
+        </div>
+        <div class="row">
+          <label class="chk"><input type="checkbox" id="opt-debug" /> 调试日志（显示引擎原始输出）</label>
+        </div>
+      </div>
+
+      <div class="card">
+        <div id="actions">
+          <button class="btn primary" id="run">开始对齐</button>
+          <button class="btn danger" id="cancel" disabled>取消</button>
+          <button class="btn" id="save" disabled>保存结果</button>
+        </div>
+        <div id="bar-wrap"><div id="bar-inner"></div></div>
+        <div id="status">就绪</div>
+        <div id="tick"></div>
+      </div>
+    </div>
+
+    <!-- 右栏：结果与日志 -->
+    <div id="right">
+      <div id="result-wrap" class="card">
+        <h3>结果</h3>
+        <pre id="result">尚未开始。</pre>
+      </div>
+      <div id="log-card" class="card">
+        <h3>引擎输出</h3>
+        <pre id="log"></pre>
+      </div>
+    </div>
+  </div>
+
+  <!-- 批量保存去向选择 -->
+  <dialog id="save-dlg">
+    <div class="card save-dlg">
+      <p id="save-dlg-text">保存到哪里？</p>
+      <button class="btn primary" id="sv-overwrite">覆盖原歌词文件</button>
+      <button class="btn" id="sv-folder">选择输出文件夹…</button>
+      <button class="btn" id="sv-cancel">取消</button>
+    </div>
+  </dialog>
+
+  <script src="align.js"></script>
+</body>
+</html>

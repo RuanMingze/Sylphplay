@@ -1,0 +1,42 @@
+# ---- 系统 / 编辑器 ----
+.DS_Store
+Thumbs.db
+desktop.ini
+.idea/
+.vscode/
+*.iml
+*.swp
+
+# ---- Node / Electron ----
+node_modules/
+dist/
+*.log
+npm-debug.log*
+pnpm-debug.log*
+
+# ---- 本地调试与运行时数据 ----
+.dlc/
+.trae/
+todo.md
+
+# ---- C# 辅助工具（assoc-helper 等）----
+**/bin/
+**/obj/
+assoc-helper/out/
+
+# ---- Flutter 手机版 ----
+mobile/build/
+mobile/.dart_tool/
+mobile/.flutter-plugins
+mobile/.flutter-plugins-dependencies
+mobile/android/.gradle/
+mobile/android/build/
+mobile/android/local.properties
+mobile/ios/Pods/
+mobile/ios/.symlinks/
+mobile/ios/Flutter/ephemeral/
+mobile/ios/Flutter/Generated.xcconfig
+mobile/ios/Flutter/flutter_export_environment.sh
+
+# ---- 构建产物 / 归档 ----
+*.zip

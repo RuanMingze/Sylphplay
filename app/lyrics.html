@@ -1,0 +1,221 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline'; font-src 'self' data:" />
+  <title>桌面歌词</title>
+  <link rel="stylesheet" href="../assets/fontawesome/css/all.min.css" />
+  <style>
+    html, body { height: 100%; margin: 0; overflow: hidden; background: transparent; -webkit-user-select: none; user-select: none; }
+    /* 四周留少许内边距，避免 hover 边框在窗口边缘被裁剪 */
+    body { display: flex; align-items: center; justify-content: center; padding: 5px 8px; box-sizing: border-box; }
+    #wrap { width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; position: relative;
+      /* 走 JS 拖动，不用系统 drag（否则 drag 区会拦截 hover/点击）。
+         整窗 no-drag → 悬停/菜单/按钮全程生效，任意位置按住即可拖动 */
+      -webkit-app-region: no-drag; cursor: move; touch-action: none;
+      /* 默认透明，悬停时显示边框提示可交互 */
+      border: 1px solid transparent; border-radius: 12px; transition: border-color .15s ease, background-color .15s ease; }
+    #wrap:hover { border-color: rgba(255, 255, 255, 0.35); background: rgba(0, 0, 0, 0.12); }
+    /* 整行可拖动窗口 */
+    #lyric {
+      font-family: "Segoe UI", "Microsoft YaHei", system-ui, sans-serif;
+      font-weight: 600; font-size: 30px; color: #ffffff;
+      text-shadow: 0 1px 8px rgba(0, 0, 0, 0.55);
+      white-space: nowrap; letter-spacing: 0.3px;
+      padding: 6px 16px; border-radius: 10px;
+      /* 非拖拽：让鼠标落在字上也能触发父级 hover 与按钮交互 */
+      -webkit-app-region: no-drag; cursor: default;
+      max-width: 92vw; overflow: hidden; text-overflow: ellipsis;
+    }
+    /* 悬停弹出的控制条 */
+    /* 逐字填充：普通行双层覆盖 / 卡拉OK逐词 */
+    #lyric.fill { position: relative; display: grid; align-items: center; justify-items: center; }
+    #lyric.fill .lb, #lyric.fill .lf { grid-area: 1 / 1; white-space: pre; }
+    /* 底字用用户色但压暗，填充用主题橙 → 任何底色下都能看出从左到右的填色进度 */
+    #lyric.fill .lb { color: inherit; opacity: 0.4; }
+    #lyric.fill .lf { color: #ff7a00; }
+    #bar {
+      position: absolute; top: 4px; right: 8px; z-index: 2;
+      display: none; align-items: center; gap: 5px;
+      background: rgba(0, 0, 0, 0.6); border: 1px solid rgba(255, 255, 255, 0.15);
+      border-radius: 9px; padding: 3px 7px; -webkit-app-region: no-drag;
+    }
+    #wrap:hover #bar { display: flex; }
+    .tb { border: none; cursor: pointer; color: #fff; background: transparent;
+      font-size: 13px; font-weight: 700; line-height: 1; padding: 3px 6px; border-radius: 5px; }
+    .tb:hover { background: rgba(255, 255, 255, 0.18); }
+    .tb.x { color: #ff7a7a; }
+    #wv { color: #fff; font-size: 11px; min-width: 26px; text-align: center; -webkit-user-select: none; }
+    .sw { width: 15px; height: 15px; border-radius: 50%; border: 1px solid rgba(255,255,255,.35);
+      cursor: pointer; padding: 0; }
+    .sw:hover { transform: scale(1.15); }
+    .sep { width: 1px; height: 14px; background: rgba(255,255,255,.25); margin: 0 2px; }
+    #sizev { color: #fff; font-size: 11px; min-width: 24px; text-align: center; -webkit-user-select: none; }
+  </style>
+</head>
+<body>
+  <div id="wrap">
+    <div id="lyric"></div>
+    <div id="bar">
+      <button class="tb" id="dec" title="字号调小">–</button>
+      <span id="sizev">30</span>
+      <button class="tb" id="inc" title="字号调大">+</button>
+      <span class="sep"></span>
+      <button class="sw" data-c="#ffffff" title="白色" style="background:#ffffff"></button>
+      <button class="sw" data-c="#ff7a00" title="橙色" style="background:#ff7a00"></button>
+      <button class="sw" data-c="#ff5a5a" title="红色" style="background:#ff5a5a"></button>
+      <button class="sw" data-c="#5ad0a0" title="绿色" style="background:#5ad0a0"></button>
+      <button class="sw" data-c="#5aa8ff" title="蓝色" style="background:#5aa8ff"></button>
+      <button class="sw" data-c="#ffd75a" title="黄色" style="background:#ffd75a"></button>
+      <span class="sep"></span>
+      <button class="tb" id="wminus" title="变窄">‹</button>
+      <span id="wv">920</span>
+      <button class="tb" id="wplus" title="变宽">›</button>
+      <span class="sep"></span>
+      <button class="tb" id="center" title="水平居中（x 方向）"><i class="fa-solid fa-align-center"></i></button>
+      <span class="sep"></span>
+      <button class="tb x" id="cl" title="关闭歌词">✕</button>
+    </div>
+  </div>
+
+  <script>
+    const lyric = document.getElementById('lyric')
+    const sizev = document.getElementById('sizev')
+    const wrap = document.getElementById('wrap')
+    // 不能用 const sylph：与 contextBridge 暴露的主世界同名 property 冲突会导致
+    // "Identifier 'sylph' has already been declared" 语法错误，改用别名读取
+    const bridge = window.sylph || {}
+    let st = { size: 30, color: '#ffffff', width: 920 }
+    const wv = document.getElementById('wv')
+    const wMinus = document.getElementById('wminus')
+    const wPlus = document.getElementById('wplus')
+
+    function apply() { lyric.style.fontSize = st.size + 'px'; lyric.style.color = st.color; sizev.textContent = st.size }
+    function emit() { if (bridge.lyricsStyle) bridge.lyricsStyle({ size: st.size, color: st.color }) }
+
+    function esc(s) { return String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c])) }
+    // 渲染整行歌词：普通文本 或 逐字填充（对象载荷）
+    function render(t) {
+      if (t && typeof t === 'object' && t.fill) {
+        // key 带上行起始时间：重复副歌（文本相同）也能识别为新行，避免沿用上一行的填充模型
+        const key = t.mode + '\u0000' + (t.t == null ? '' : t.t) + '\u0000' + t.text
+        // 同一句重复推送时不重建，避免 clip 被反复复位导致闪烁
+        if (lyric.dataset.fk !== key) {
+          lyric.classList.add('fill')
+          if (t.mode === 'words') {
+            lyric.classList.add('words')
+            lyric.innerHTML = (t.words || []).map(s => `<span class="lw">${esc(s)}</span>`).join('')
+          } else {
+            lyric.classList.remove('words')
+            lyric.innerHTML = `<span class="lb">${esc(t.text || '')}</span><span class="lf" style="clip-path:inset(0 100% 0 0)">${esc(t.text || '')}</span>`
+          }
+          lyric.dataset.fk = key
+          fillPts = (Array.isArray(t.pts) && t.pts.length >= 2) ? t.pts : null
+          resetFill()   // 新行：清空旧锚点，等主窗口推送本行首个锚点
+        }
+      } else {
+        lyric.classList.remove('fill', 'words')
+        delete lyric.dataset.fk
+        lyric.textContent = (t == null) ? '' : String(t)
+        fillPts = null
+        resetFill()
+      }
+    }
+    if (bridge.onLyricsSet) bridge.onLyricsSet(render)
+    // 桌面歌词逐字填充进度：歌词小窗自驱动。
+    // 主窗口仅推送「(p, now)」时钟锚点（最小化/隐藏后改由 setInterval 持续提供）；
+    // 本窗 rAF 在两个锚点之间用本地时钟线性外推，保证窗口任何时候都平滑、不”顿”。
+    let phPrev = null, phLast = null, phRAf = null
+    let fillPts = null   // 本行分段折线模型 [[音频秒, 填充分数], ...]（由主窗口随行下发）
+    const clamp01 = (v) => Math.min(1, Math.max(0, v))
+    // 按折线模型求值：段内线性插值，超出末段用最后一段斜率外推——
+    // 与主窗口 lineFraction() 同源，因此「末字遇长间奏、斜率骤降」时不会过冲再回缩
+    function evalPts(pts, time) {
+      if (!pts || pts.length < 2) return null
+      if (time <= pts[0][0]) return clamp01(pts[0][1])
+      const last = pts[pts.length - 1]
+      if (time >= last[0]) {
+        const prev = pts[pts.length - 2]
+        const dt = last[0] - prev[0]
+        if (dt <= 0) return clamp01(last[1])
+        return clamp01(last[1] + (last[1] - prev[1]) / dt * (time - last[0]))
+      }
+      for (let i = 1; i < pts.length; i++) {
+        const a = pts[i - 1], b = pts[i]
+        if (time <= b[0]) {
+          const dt = b[0] - a[0]
+          if (dt <= 0) return clamp01(b[1])
+          return clamp01(a[1] + (b[1] - a[1]) * (time - a[0]) / dt)
+        }
+      }
+      return clamp01(last[1])
+    }
+    function resetFill() { phPrev = null; phLast = null; if (phRAf) { cancelAnimationFrame(phRAf); phRAf = null } }
+    function onFill(s) {
+      if (!s || s.p == null) return
+      phPrev = phLast
+      phLast = { p: s.p, now: s.now || 0, t: performance.now() }
+      if (!phRAf) phRAf = requestAnimationFrame(tickFill)
+    }
+    function tickFill() {
+      phRAf = null
+      if (!phLast) return
+      // 主窗口校准停顿（暂停/切行间隙）超过 340ms：停止外推，停在最后一帧
+      if (performance.now() - phLast.t > 340) return
+      // 用本地时钟把最近锚点线性外推为当前音频秒，再据此求填充分数
+      const noref = phLast.now + (performance.now() - phLast.t) / 1000
+      let p
+      const ep = evalPts(fillPts, noref)
+      if (ep != null) {
+        // 有本行折线模型：直接按模型求值（与主窗口同源，无外推过冲）
+        p = ep
+      } else {
+        // 无模型（旧载荷）时回退到「(now,p) 斜率」线性外推
+        p = phLast.p
+        if (phPrev && phLast.now > phPrev.now) {
+          const rate = (phLast.p - phPrev.p) / (phLast.now - phPrev.now)
+          p = phLast.p + rate * (noref - phLast.now)
+        }
+      }
+      p = clamp01(p)
+      const f = lyric.querySelector('.lf')
+      if (f) f.style.clipPath = 'inset(0 ' + (100 - p * 100).toFixed(2) + '% 0 0)'
+      phRAf = requestAnimationFrame(tickFill)
+    }
+    if (bridge.onLyricsFill) bridge.onLyricsFill(onFill)
+    if (bridge.onLyricsStyle) bridge.onLyricsStyle((s) => {
+      if (s) { st = { size: s.size || 30, color: s.color || '#ffffff', width: s.width || 920 }; apply(); wv.textContent = s.width || 920 }
+    })
+
+    document.getElementById('inc').onclick = () => { st.size = Math.min(96, st.size + 2); apply(); emit() }
+    document.getElementById('dec').onclick = () => { st.size = Math.max(14, st.size - 2); apply(); emit() }
+    document.querySelectorAll('.sw').forEach(b => {
+      b.onclick = () => { st.color = b.dataset.c; apply(); emit() }
+    })
+    document.getElementById('cl').onclick = () => { if (bridge.lyricsClose) bridge.lyricsClose() }
+
+    // 宽度：手动加减
+    wMinus.onclick = () => { if (bridge.lyricsWidth) bridge.lyricsWidth((st.width || 920) - 60) }
+    wPlus.onclick = () => { if (bridge.lyricsWidth) bridge.lyricsWidth((st.width || 920) + 60) }
+    // 水平居中（x 方向）
+    document.getElementById('center').onclick = () => { if (bridge.lyricsCenter) bridge.lyricsCenter() }
+
+    // --- JS 拖动窗口（任意位置按住拖动，避开工具栏按钮） ---
+    let drag = null
+    wrap.addEventListener('pointerdown', (e) => {
+      if (e.target.closest('#bar')) return            // 工具栏内的按钮不触发拖动
+      drag = { sx: e.screenX, sy: e.screenY, wx: null, wy: null }
+      bridge.lyricsPos().then((p) => { if (drag) { drag.wx = p.x; drag.wy = p.y } })
+      try { wrap.setPointerCapture(e.pointerId) } catch (_) {}
+      e.preventDefault()
+    })
+    wrap.addEventListener('pointermove', (e) => {
+      if (!drag || drag.wx == null) return
+      bridge.lyricsMove(drag.wx + (e.screenX - drag.sx), drag.wy + (e.screenY - drag.sy))
+    })
+    const endDrag = () => { drag = null }
+    wrap.addEventListener('pointerup', endDrag)
+    wrap.addEventListener('pointercancel', endDrag)
+  </script>
+</body>
+</html>

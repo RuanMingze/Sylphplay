@@ -1,0 +1,113 @@
+{
+  "name": "sylphplay",
+  "productName": "Sylphplay",
+  "version": "1.0.0",
+  "description": "Sylphplay — 多媒体播放器",
+  "main": "main.js",
+  "author": {
+    "name": "Ruanftrix",
+    "email": "support@ruanftrix.cn"
+  },
+  "license": "MIT",
+  "homepage": "https://sylphplay.ruanftrix.cn",
+  "scripts": {
+    "start": "electron .",
+    "dev": "electron . --dev",
+    "build:assoc": "dotnet publish assoc-helper/assoc-helper.csproj -c Release -o assoc-helper/out -r win-x64",
+    "dist": "pnpm dist:win",
+    "dist:win": "pnpm build:assoc && electron-builder --win",
+    "dist:mac": "electron-builder --mac",
+    "dist:linux": "electron-builder --linux"
+  },
+  "build": {
+    "appId": "com.ruanftrix.sylphplay",
+    "productName": "Sylphplay",
+    "directories": {
+      "output": "dist",
+      "buildResources": "assets"
+    },
+    "electronDownload": {
+      "mirror": "https://mirrors.huaweicloud.com/electron/"
+    },
+    "files": [
+      "main.js",
+      "preload.js",
+      "app/**/*",
+      "assets/**/*"
+    ],
+    "win": {
+      "icon": "assets/icon.ico",
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "extraResources": [
+        {
+          "from": "assoc-helper/out",
+          "to": ".",
+          "filter": [
+            "assoc-helper.exe"
+          ]
+        }
+      ]
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "installerIcon": "assets/icon.ico",
+      "uninstallerIcon": "assets/icon.ico",
+      "installerHeaderIcon": "assets/icon.ico"
+    },
+    "mac": {
+      "icon": "assets/icon.png",
+      "category": "public.app-category.video",
+      "target": [
+        {
+          "target": "dmg",
+          "arch": [
+            "x64"
+          ]
+        },
+        {
+          "target": "zip",
+          "arch": [
+            "x64"
+          ]
+        }
+      ]
+    },
+    "linux": {
+      "icon": "assets/icon.png",
+      "category": "AudioVideo",
+      "maintainer": "Ruanftrix <support@ruanftrix.cn>",
+      "synopsis": "Sylphplay 多媒体播放器",
+      "target": [
+        {
+          "target": "AppImage",
+          "arch": [
+            "x64"
+          ]
+        },
+        {
+          "target": "deb",
+          "arch": [
+            "x64"
+          ]
+        }
+      ]
+    }
+  },
+  "devDependencies": {
+    "electron": "^33.2.0",
+    "electron-builder": "^25.1.8"
+  },
+  "dependencies": {
+    "@resvg/resvg-js": "^2.6.2",
+    "axios": "^1.20.0",
+    "sharp": "^0.35.5"
+  }
+}

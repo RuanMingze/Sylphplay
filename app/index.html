@@ -1,0 +1,236 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self' file: data: blob: https:; script-src 'self' blob: 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' file: data: blob: https:; media-src file: blob: https:; connect-src 'self' file: data: blob: https:; frame-src 'self' blob:" />
+  <title>Sylphplay</title>
+  <link rel="icon" href="../assets/icon.png" />
+  <link rel="stylesheet" href="../assets/fontawesome/css/all.min.css" />
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <!-- ===== 顶部工具栏 ===== -->
+  <header id="topbar">
+    <div class="brand" id="brand">
+      <img src="../assets/icon.png" alt="logo" class="brand-logo" />
+      <span class="brand-name">Sylphplay</span>
+    </div>
+
+    <div class="topbar-actions">
+      <div class="add-wrap" id="add-wrap">
+        <button class="icon-btn" id="btn-add" title="添加文件 / 文件夹"><i class="fa-solid fa-plus"></i></button>
+        <div class="add-menu" id="add-menu" hidden>
+          <div class="mode-item" data-add="files"><i class="fa-solid fa-file-audio"></i>选择文件</div>
+          <div class="mode-item" data-add="folder"><i class="fa-solid fa-folder-open"></i>添加文件夹</div>
+          <div class="mode-item" data-add="url"><i class="fa-solid fa-link"></i>添加 URL</div>
+        </div>
+      </div>
+      <button class="icon-btn" id="btn-queue" title="播放队列"><i class="fa-solid fa-list"></i></button>
+      <button class="icon-btn" id="btn-theme" title="切换深浅主题"><i id="theme-ico" class="fa-solid fa-moon"></i></button>
+      <button class="icon-btn" id="btn-align" title="强制对齐" hidden><i class="fa-solid fa-wand-magic-sparkles"></i></button>
+      <button class="icon-btn" id="btn-settings" title="设置"><i class="fa-solid fa-gear"></i></button>
+      </div>  <!-- 自定义标题栏窗口控制：最小化 / 最大化·还原 / 关闭 -->
+      <div class="win-controls">
+        <button class="wc-btn" id="wc-min" title="最小化" aria-label="最小化">
+          <svg viewBox="0 0 16 16"><line x1="3" y1="8" x2="13" y2="8" /></svg>
+        </button>
+        <button class="wc-btn" id="wc-max" title="最大化" aria-label="最大化">
+          <svg id="wc-max-svg" viewBox="0 0 16 16"><rect class="hollow" x="3" y="3" width="10" height="10" rx="1.5" /></svg>
+        </button>
+        <button class="wc-btn wc-close" id="wc-close" title="关闭" aria-label="关闭">
+          <svg viewBox="0 0 16 16"><line x1="4" y1="4" x2="12" y2="12" /><line x1="12" y1="4" x2="4" y2="12" /></svg>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- 国庆主题横幅（默认隐藏，彩蛋激活时显示） -->
+  <div id="nat-banner" class="nat-banner" hidden>
+    <i class="fa-solid fa-star"></i>
+    <span class="nat-main">热烈庆祝中华人民共和国成立77周年</span>
+    <span class="nat-sub">盛世中国 · 欢度国庆</span>
+    <i class="fa-solid fa-star"></i>
+  </div>
+  <!-- ===== 主舞台 ===== -->
+  <main id="stage-wrap">
+    <!-- 空状态 / 拖放区 -->
+    <section id="empty" class="empty active">
+      <div class="empty-inner">
+        <img src="../assets/icon.png" class="empty-logo" alt="" />
+        <h2 class="empty-title">把媒体拖进来，或点按钮添加</h2>
+        <p class="empty-sub">支持图片、视频、音乐 · 可拖入大量文件 / 文件夹自动进入队列</p>
+        <div class="empty-actions">
+          <button class="btn primary" id="empty-add-files">选择文件</button>
+          <button class="btn" id="empty-add-folder">添加文件夹</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- 图片查看器 -->
+    <section id="view-image" class="media-view">
+      <div id="image-stage" class="image-stage">
+        <img id="image-el" alt="" draggable="false" />
+      </div>
+      <div class="img-hint" id="img-hint"></div>
+      <div class="img-map-wrap" id="img-map-wrap">
+        <canvas id="img-map" class="img-map" width="200" height="120"></canvas>
+        <div id="img-map-win" class="img-map-win"></div>
+      </div>
+    </section>
+
+    <!-- 视频查看器 -->
+    <section id="view-video" class="media-view">
+      <video id="video-el" playsinline></video>
+      <div id="vid-pause-badge" class="vid-pause-badge" hidden><i class="fa-solid fa-play"></i></div>
+    </section>
+
+    <!-- 音乐播放器 -->
+    <section id="view-audio" class="media-view">
+      <div class="audio-art" id="audio-art">
+        <img src="../assets/icon.png" alt="cover" id="audio-cover" />
+      </div>
+      <canvas id="viz" width="800" height="160"></canvas>
+      <div class="audio-title" id="audio-title"></div>
+      <div class="audio-meta" id="audio-meta"></div>
+      <!-- 歌词：导入后替代中间区域显示 -->
+      <div class="lyrics" id="lyrics" hidden>
+        <div class="lyrics-scroll" id="lyrics-scroll"></div>
+      </div>
+    </section>
+  </main>
+
+  <!-- ===== 控制条 ===== -->
+  <footer id="controlbar">
+    <!-- 传输信息 -->
+    <div class="cb-info">
+      <span class="cb-type" id="cb-type">—</span>
+      <span class="cb-name" id="cb-name" title=""></span>
+    </div>
+
+    <div class="cb-center">
+      <!-- 媒体传输控件（视频/音频） -->
+      <div class="cb-transport" id="cb-transport">
+        <button class="cbtn" id="btn-prev" title="上一项"><i class="fa-solid fa-backward-step"></i></button>
+        <button class="cbtn play" id="btn-play" title="播放/暂停"><i id="play-ico" class="fa-solid fa-play"></i></button>
+        <button class="cbtn" id="btn-next" title="下一项"><i class="fa-solid fa-forward-step"></i></button>
+        <div class="seek-row">
+          <span class="time" id="time-cur">0:00</span>
+          <input type="range" id="seek" min="0" max="0" value="0" step="0.1" />
+          <span class="time" id="time-total">0:00</span>
+          <!-- 视频悬停进度缩略图 -->
+          <div class="seek-pv" id="seek-pv" hidden>
+            <canvas id="seek-pv-c" width="176" height="99"></canvas>
+            <span class="seek-pv-t" id="seek-pv-t">0:00</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 图片控件：相对整条控制条居中 -->
+    <div class="cb-image" id="cb-image">
+      <button class="cbtn" id="img-prev" title="上一张"><i class="fa-solid fa-chevron-left"></i></button>
+      <div class="img-zoom-group">
+        <button class="cbtn" id="img-out" title="缩小"><i class="fa-solid fa-minus"></i></button>
+        <span class="zoom-info" id="zoom-info">100%</span>
+        <button class="cbtn" id="img-in" title="放大"><i class="fa-solid fa-plus"></i></button>
+      </div>
+      <button class="cbtn" id="img-fit" title="适应窗口"><i class="fa-solid fa-expand"></i></button>
+      <button class="cbtn" id="img-rotate" title="旋转 90°"><i class="fa-solid fa-rotate-right"></i></button>
+      <button class="cbtn" id="img-info" title="文件信息"><i class="fa-solid fa-circle-info"></i></button>
+      <button class="cbtn" id="img-next" title="下一张"><i class="fa-solid fa-chevron-right"></i></button>
+    </div>
+
+    <div class="cb-right" id="cb-right">
+      <label class="vol-wrap" title="音量">
+        <span class="vol-ico"><i class="fa-solid fa-volume-high"></i></span>
+        <input type="range" id="volume" min="0" max="100" value="80" />
+      </label>
+      <select id="speed" class="cselect" title="播放速度">
+        <option value="0.5">0.5×</option>
+        <option value="0.75">0.75×</option>
+        <option value="1" selected>1×</option>
+        <option value="1.25">1.25×</option>
+        <option value="1.5">1.5×</option>
+        <option value="2">2×</option>
+      </select>
+      <div class="mode-wrap" id="mode-wrap">
+        <button class="cbtn" id="btn-mode" title="播放模式"><i class="fa-solid fa-repeat-1"></i></button>
+        <div class="mode-menu" id="mode-menu" hidden></div>
+      </div>
+      <button class="cbtn" id="btn-info" title="文件信息"><i class="fa-solid fa-circle-info"></i></button>
+      <button class="cbtn" id="btn-lrc" title="导入歌词"><i class="fa-solid fa-note-sticky"></i></button>
+      <button class="cbtn" id="btn-fs" title="全屏"><i class="fa-solid fa-expand"></i></button>
+    </div>
+  </footer>
+
+  <!-- ===== 队列面板 ===== -->
+  <aside id="queue-panel" class="panel">
+    <div class="panel-head">
+      <span>播放队列</span>
+      <span class="q-count" id="q-count">0</span>
+      <div class="panel-head-actions">
+        <div class="seg q-view-seg">
+          <button class="seg-bar" id="q-view-list" title="列表视图"><i class="fa-solid fa-list"></i></button>
+          <button class="seg-bar" id="q-view-grid" title="缩略图网格"><i class="fa-solid fa-table-cells"></i></button>
+        </div>
+        <button class="icon-btn sm" id="q-clear" title="清空"><i class="fa-solid fa-trash-can"></i></button>
+        <button class="icon-btn sm" id="q-close" title="收起"><i class="fa-solid fa-xmark"></i></button>
+      </div>
+    </div>
+    <div class="q-tools">
+      <div class="q-search">
+        <i class="fa-solid fa-magnifying-glass"></i>
+        <input id="q-search" type="text" placeholder="搜索文件名…" spellcheck="false" />
+        <button class="q-sclear" id="q-search-clear" title="清除"><i class="fa-solid fa-xmark"></i></button>
+      </div>
+      <div class="seg q-filter-seg">
+        <button class="seg-bar active" data-qf="all" title="不限类型">综合</button>
+        <button class="seg-bar" data-qf="image" title="只看图片">图片</button>
+        <button class="seg-bar" data-qf="audio" title="只看音乐">音乐</button>
+        <button class="seg-bar" data-qf="video" title="只看视频">视频</button>
+      </div>
+    </div>
+    <ul id="queue-list" class="q-list"></ul>
+    <div class="q-empty" id="q-empty">队列为空，拖入媒体或点击添加</div>
+  </aside>
+
+  <!-- ===== 设置弹窗 ===== -->
+  <div id="settings-mask" class="modal-mask">
+    <div class="modal">
+      <div class="modal-head">
+        <span>设置</span>
+        <button class="icon-btn sm" id="settings-close"><i class="fa-solid fa-xmark"></i></button>
+      </div>
+      <div class="modal-body" id="settings-body"></div>
+      <div class="modal-foot">
+        <span class="foot-note">Ruanftrix · Sylphplay</span>
+        <button class="btn primary" id="settings-done">完成</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== 文件信息弹窗 ===== -->
+  <div id="info-mask" class="modal-mask">
+    <div class="modal">
+      <div class="modal-head">
+        <span>文件信息</span>
+        <button class="icon-btn sm" id="info-close"><i class="fa-solid fa-xmark"></i></button>
+      </div>
+      <div class="modal-body" id="info-body"></div>
+      <div class="modal-foot">
+        <span class="foot-note">Ruanftrix · Sylphplay</span>
+        <button class="btn primary" id="info-done">完成</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 拖放遮罩提示 -->
+  <div id="drop-overlay" class="drop-overlay">
+    <div class="drop-box">松开以加入播放队列</div>
+  </div>
+
+  <div id="toast" class="toast"></div>
+
+  <script src="renderer.js"></script>
+</body>
+</html>
