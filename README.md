@@ -6,7 +6,7 @@
 
 **一款轻量、开源的本地多媒体播放器 —— 支持音频、视频与图片**
 
-桌面版（Electron）· 手机版（Flutter）· 不联网 · 无广告 · 无曲库
+桌面版（Electron）· 手机版（Flutter）· 本地优先 · 默认不联网 · 无广告 · 无在线曲库
 
 ![Platform: Windows](https://img.shields.io/badge/platform-Windows-0078d6?style=flat\&logo=windows)
 ![Platform: macOS](https://img.shields.io/badge/platform-macOS-000000?style=flat\&logo=apple)
@@ -32,6 +32,8 @@ Sylphplay **不是**一个音乐播放器 —— 它同时面向**音频、视�
 - 歌词：支持 LRC / 卡拉 OK 逐词歌词，桌面歌词悬浮窗
 
 它是一款**强调本地、坚守初心**的个人项目：**没有**在线曲库、音乐市场或任何付费/版权依赖，也不打算与 "云音乐" 类产品竞争。详见 [CONTRIBUTING.md](CONTRIBUTING.md) 中的方向约束。
+
+> **关于联网**：默认状态下不发起任何网络请求。仅两个实验特性会在你**手动开启后**联网——「自动寻找缺失歌词」（LRCLIB 歌词查询）与「强制对齐 DLC」（下载对齐引擎，仅 Windows）；两者默认关闭，随时可以关回。
 
 ***
 
