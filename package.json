@@ -15,9 +15,9 @@
     "dev": "electron . --dev",
     "build:assoc": "dotnet publish assoc-helper/assoc-helper.csproj -c Release -o assoc-helper/out -r win-x64",
     "dist": "pnpm dist:win",
-    "dist:win": "pnpm build:assoc && electron-builder --win",
-    "dist:mac": "electron-builder --mac",
-    "dist:linux": "electron-builder --linux"
+    "dist:win": "pnpm build:assoc && electron-builder --win --publish never",
+    "dist:mac": "electron-builder --mac --publish never",
+    "dist:linux": "electron-builder --linux --publish never"
   },
   "build": {
     "appId": "com.ruanftrix.sylphplay",
@@ -78,7 +78,7 @@
       "category": "AudioVideo",
       "maintainer": "Ruanftrix <support@ruanftrix.cn>",
       "synopsis": "Sylphplay 多媒体播放器",
-      "artifactName": "${productName}-${version}-Linux-${arch}-Setup.${ext}",
+      "artifactName": "${productName}-${version}-Linux-x64-Setup.${ext}",
       "target": [
         {
           "target": "deb",
