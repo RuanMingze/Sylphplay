@@ -1,0 +1,11 @@
+blank_issues_enabled: true
+contact_links:
+  - name: Sylphplay 项目主页
+    url: https://github.com/RuanMingze/Sylphplay
+    about: 查看 README、已知问题和开发计划
+  - name: 个人主页
+    url: https://Ruanftrix.cn
+    about: 更多项目和联系信息
+  - name: 联系邮箱
+    url: mailto:Sylphplay@ruanftrix.cn
+    about: 如有敏感问题或合作事宜可邮件联系
