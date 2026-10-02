@@ -1,0 +1,45 @@
+name: 功能需求提案
+description: 提交Sylphplay新功能、交互优化建议
+title: "[Feature] "
+labels: ["enhancement"]
+assignees: []
+body:
+  - type: markdown
+    attributes:
+      value: |
+        ## 💡 新功能提案
+        描述你想要增加的功能，以及它解决什么痛点。
+  - type: textarea
+    id: problem_statement
+    attributes:
+      label: 当前存在什么问题
+      placeholder: 播放媒体文件时，原文件被删除会直接造成程序崩溃
+    validations:
+      required: true
+  - type: textarea
+    id: suggest_solution
+    attributes:
+      label: 你期望的实现方案
+      placeholder: 播放期间锁定文件句柄，阻止其他程序删除
+    validations:
+      required: true
+  - type: dropdown
+    id: target_platform
+    attributes:
+      label: 适用平台
+      options:
+        - 全平台(桌面+移动端)
+        - 仅Windows Electron桌面端
+        - 仅Flutter移动端(安卓/iOS)
+    validations:
+      required: true
+  - type: checkboxes
+    id: check_items
+    attributes:
+      label: 自查项
+      description: 请确认下面条目
+      options:
+        - label: 确认该需求不存在于现有Issue列表
+        - label: 清楚跨平台实现的限制（如iOS部分能力受限）
+    validations:
+      required: false
