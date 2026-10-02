@@ -1,0 +1,103 @@
+name: 性能问题
+description: 提交卡顿、内存占用高、解码缓慢、启动慢等性能相关问题
+title: "[Perf] "
+labels: ["performance"]
+assignees: ["RuanMingze"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        ## ⚡ 性能问题报告
+        请尽量提供具体的性能数据（CPU/内存占用、卡顿程度），方便定位瓶颈。
+
+  - type: textarea
+    id: perf_desc
+    attributes:
+      label: 问题描述
+      description: 简单描述你遇到的性能问题
+      placeholder: 播放4K视频时CPU占用极高，风扇狂转；或启动应用等待时间过长
+    validations:
+      required: true
+
+  - type: dropdown
+    id: perf_type
+    attributes:
+      label: 性能问题类型
+      options:
+        - 播放卡顿 / 掉帧
+        - CPU 占用过高
+        - 内存占用过高 / 泄漏
+        - 启动 / 加载缓慢
+        - 文件扫描 / 索引缓慢
+        - 其他
+    validations:
+      required: true
+
+  - type: textarea
+    id: repro_steps
+    attributes:
+      label: 复现步骤
+      description: 描述在什么操作下出现性能问题
+      placeholder: |
+        1. 打开某个大体积视频文件
+        2. 拖动进度条 seek 到中间位置
+        3. 画面卡顿数秒才响应
+    validations:
+      required: true
+
+  - type: textarea
+    id: perf_data
+    attributes:
+      label: 性能数据（可选但推荐）
+      description: 任务管理器 / 活动监视器中的 CPU、内存占用数值，或卡顿持续时间
+      placeholder: |
+        - CPU 占用：约 80%
+        - 内存占用：约 500 MB
+        - 卡顿持续：约 3-5 秒
+      render: bash
+    validations:
+      required: false
+
+  - type: textarea
+    id: media_info
+    attributes:
+      label: 媒体文件信息（如适用）
+      description: 出现问题的文件格式、大小、编码类型
+      placeholder: |
+        - 格式：MP4 / MKV / MP3
+        - 大小：约 2 GB
+        - 视频编码：H.265 / HEVC
+        - 分辨率：4K (3840x2160)
+      render: bash
+    validations:
+      required: false
+
+  - type: dropdown
+    id: platform
+    attributes:
+      label: 运行平台
+      options:
+        - Windows Electron桌面端
+        - Android Flutter移动端
+        - iOS Flutter移动端
+        - Linux
+        - macOS
+        - 其他
+    validations:
+      required: true
+
+  - type: input
+    id: app_version
+    attributes:
+      label: 应用版本号
+      placeholder: 例如 v0.8.2
+    validations:
+      required: true
+
+  - type: textarea
+    id: extra_info
+    attributes:
+      label: 附加信息（可选）
+      description: 截图、日志、系统配置等补充内容
+    validations:
+      required: false
