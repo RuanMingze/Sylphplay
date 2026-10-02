@@ -1,0 +1,67 @@
+name: 文档修订
+description: 提交文档错别字、描述矛盾、信息过时、README优化等文档类问题
+title: "[Docs] "
+labels: ["docs"]
+assignees: ["RuanMingze"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        ## 📖 文档修订反馈
+        用于修正错别字、语句不通、信息冲突、过时描述、缺失说明等文档相关问题。
+
+  - type: textarea
+    id: docs_desc
+    attributes:
+      label: 问题描述
+      description: 文档存在什么问题
+      placeholder: README内某段文字有错别字 / 两处描述逻辑冲突
+    validations:
+      required: true
+
+  - type: input
+    id: docs_location
+    attributes:
+      label: 文档位置
+      description: 文件路径，例如 `README.md` / `docs/install.md`
+      placeholder: README.md
+    validations:
+      required: true
+
+  - type: textarea
+    id: old_text
+    attributes:
+      label: 当前原文
+      placeholder: 粘贴有问题的原文片段
+    validations:
+      required: true
+
+  - type: textarea
+    id: suggest_fix
+    attributes:
+      label: 建议修改内容
+      placeholder: 写出你认为正确的文字
+    validations:
+      required: true
+
+  - type: dropdown
+    id: docs_type
+    attributes:
+      label: 问题类型
+      options:
+        - 错别字 / 标点错误
+        - 描述前后矛盾
+        - 信息过时
+        - 内容缺失
+        - 语句不通顺
+        - 其他文档问题
+    validations:
+      required: true
+
+  - type: textarea
+    id: extra_info
+    attributes:
+      label: 附加信息（可选）
+      description: 截图、补充参考链接
+    validations:
+      required: false
