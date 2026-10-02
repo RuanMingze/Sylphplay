@@ -1,0 +1,65 @@
+name: Bug 报告
+description: 用于提交Sylphplay程序异常、崩溃、功能失效类问题
+title: "[BUG] "
+labels: ["bug"]
+assignees: []
+body:
+  - type: markdown
+    attributes:
+      value: |
+        ## 🐛 Bug 信息填写
+        请尽量完整描述问题，包含复现步骤，方便定位。
+  - type: textarea
+    id: bug_desc
+    attributes:
+      label: 问题描述
+      description: 简单描述发生了什么异常
+      placeholder: 打开视频文件后，播放器无画面，但音频正常播放
+    validations:
+      required: true
+  - type: textarea
+    id: repro_steps
+    attributes:
+      label: 复现步骤
+      description: 一步步写出触发这个bug的操作
+      placeholder: |
+        1. 打开Sylphplay
+        2. 添加指定媒体文件
+        3. 点击播放
+        4. 出现异常
+    validations:
+      required: true
+  - type: textarea
+    id: expected_result
+    attributes:
+      label: 预期正常行为
+      placeholder: 播放时画面和音频同步输出
+    validations:
+      required: true
+  - type: dropdown
+    id: platform
+    attributes:
+      label: 运行平台
+      options:
+        - Windows Electron桌面端
+        - Android Flutter移动端
+        - iOS Flutter移动端
+        - Linux
+        - macOS
+        - 其他
+    validations:
+      required: true
+  - type: input
+    id: app_version
+    attributes:
+      label: 应用版本号
+      placeholder: 例如 v0.8.2
+    validations:
+      required: true
+  - type: textarea
+    id: extra_info
+    attributes:
+      label: 附加信息（可选）
+      description: 截图、日志、媒体文件信息等补充内容
+    validations:
+      required: false
