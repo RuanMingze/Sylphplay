@@ -26,9 +26,6 @@
       "output": "dist",
       "buildResources": "assets"
     },
-    "electronDownload": {
-      "mirror": "https://mirrors.huaweicloud.com/electron/"
-    },
     "files": [
       "main.js",
       "preload.js",
@@ -37,6 +34,7 @@
     ],
     "win": {
       "icon": "assets/icon.ico",
+      "artifactName": "${productName}-${version}-Windows-${arch}-Setup.${ext}",
       "target": [
         {
           "target": "nsis",
@@ -65,15 +63,10 @@
     "mac": {
       "icon": "assets/icon.png",
       "category": "public.app-category.video",
+      "artifactName": "${productName}-${version}-macOS-${arch}-Setup.${ext}",
       "target": [
         {
           "target": "dmg",
-          "arch": [
-            "x64"
-          ]
-        },
-        {
-          "target": "zip",
           "arch": [
             "x64"
           ]
@@ -85,13 +78,8 @@
       "category": "AudioVideo",
       "maintainer": "Ruanftrix <support@ruanftrix.cn>",
       "synopsis": "Sylphplay 多媒体播放器",
+      "artifactName": "${productName}-${version}-Linux-${arch}-Setup.${ext}",
       "target": [
-        {
-          "target": "AppImage",
-          "arch": [
-            "x64"
-          ]
-        },
         {
           "target": "deb",
           "arch": [

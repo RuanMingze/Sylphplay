@@ -86,9 +86,9 @@ Sylphplay **不是**一个音乐播放器 —— 它同时面向**音频、视�
 
 - OS：Windows 10 / 11、macOS 10.15+、主流 Linux 发行版（x64）
 
-- Node.js：18+（推荐 20+）
+- Node.js：**22+**（pnpm 12 要求 Node 22 起）
 
-- 包管理器：**pnpm**（项目强制使用，见 [.npmrc](.npmrc)）
+- 包管理器：**pnpm**（推荐 12+，构建脚本白名单见 [pnpm-workspace.yaml](pnpm-workspace.yaml)）
 
 - .NET SDK：**net10.0**（仅 **Windows** 构建 `assoc-helper` 时需要，用于生成文件关联工具）
 
@@ -100,7 +100,7 @@ Sylphplay **不是**一个音乐播放器 —— 它同时面向**音频、视�
 | 界面     | 原生 HTML / CSS / JavaScript（无前端框架）              |
 | 图标     | Font Awesome Free 6                            |
 | 文件外联工具 | C# / .NET（`assoc-helper`，自包含单文件，仅 Windows）       |
-| 打包     | electron-builder（Windows NSIS / macOS dmg+zip / Linux AppImage+deb） |
+| 打包     | electron-builder（Windows NSIS / macOS dmg / Linux deb） |
 
 ### 快速开始
 
@@ -114,8 +114,8 @@ pnpm dev            # 开发模式（带 --dev 标记）
 
 # 3. 构建安装包（按目标平台选择，产物输出到 dist/）
 pnpm dist:win       # Windows：NSIS 安装包（会先编译 .NET helper）
-pnpm dist:mac       # macOS：dmg + zip
-pnpm dist:linux     # Linux：AppImage + deb
+pnpm dist:mac       # macOS：dmg
+pnpm dist:linux     # Linux：deb
 ```
 
 > `pnpm dist` 等价于 `pnpm dist:win`。
@@ -123,9 +123,9 @@ pnpm dist:linux     # Linux：AppImage + deb
 #### 构建平台注意事项
 
 - **macOS 包必须在 macOS 上构建**（生成 `.icns` / `.dmg` 依赖系统的 `iconutil`、`hdiutil`，需安装 Xcode Command Line Tools）。产物默认未签名，首次打开会被 Gatekeeper 拦截，正式分发需 Apple 开发者签名与公证。
-- **Linux 包建议在 Linux（或 Docker）中构建**：AppImage 需要 FUSE2，deb 需要 `dpkg` 与 `fakeroot`。
+- **Linux 包建议在 Linux（或 Docker）中构建**：deb 需要 `dpkg`、`fakeroot` 与 `binutils`（`ar`）。
 - 原生依赖（`sharp`、`@resvg/resvg-js`）会按各平台自动安装对应二进制，无需额外处理。
-- Electron 二进制下载变慢时，可在 [.npmrc](.npmrc) 中调整镜像源。
+- 仓库默认使用**官方源**（npm 官方仓库 / Electron 官方分发），以保证 CI 构建速度；国内本地开发若嫌慢，可在用户级 `~/.npmrc` 自行配置镜像，不影响仓库。
 
 ### 项目结构
 
@@ -135,7 +135,7 @@ pnpm dist:linux     # Linux：AppImage + deb
 ├── preload.js               # 预加载脚本：安全暴露 window.sylph API（含平台标识）
 ├── package.json             # 依赖 / 打包配置（electron-builder，含 win/mac/linux 目标）
 ├── pnpm-workspace.yaml      # pnpm 配置：允许 electron 执行安装脚本（allowBuilds）
-├── .npmrc                   # pnpm / Electron 镜像配置
+├── .github/workflows/       # CI：按 tag 自动构建各端产物（仅上传 artifact，不发布 Release）
 ├── app/
 │   ├── index.html           # 主界面（HTML 骨架）
 │   ├── styles.css           # 主界面样式
