@@ -15,6 +15,8 @@
 ![Platform: iOS](https://img.shields.io/badge/platform-iOS-000000?style=flat\&logo=ios)
 ![License: MIT](https://img.shields.io/badge/license-MIT-blue?style=flat)
 
+<img src="assets/screenshot-home.png" width="820" alt="Sylphplay 主界面——把媒体拖进来，或点按钮添加" />
+
 </div>
 
 ***
