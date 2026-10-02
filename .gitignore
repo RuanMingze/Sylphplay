@@ -40,3 +40,6 @@ mobile/ios/Flutter/flutter_export_environment.sh
 
 # ---- 构建产物 / 归档 ----
 *.zip
+
+# ---- 介绍页（独立仓库 RuanMingze/syi 克隆于此，不进主仓库）----
+.intro/
