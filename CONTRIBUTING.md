@@ -33,7 +33,7 @@ Sylphplay 是一个**定位明确**的本地多媒体播放器，同时面向**�
 ```bash
 # 环境要求
 # - Node.js 22+
-# - pnpm 12+
+# - pnpm 12
 # - .NET SDK net10.0（仅构建 assoc-helper 时需要）
 
 pnpm install
