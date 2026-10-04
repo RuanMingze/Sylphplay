@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:io';
 import 'dart:math' as math;
 
+import 'package:fast_gbk/fast_gbk.dart';
 import 'package:path/path.dart' as p;
 
 /// 网络歌词白名单清洗 —— 对应 sanitizeAutoLyrics()
@@ -200,11 +201,7 @@ Future<String?> findSidecarLrc(String audioPath) async {
       final f = File(c);
       if (await f.exists()) {
         try {
-          final bytes = await f.readAsBytes();
-          // 优先 UTF-8（允许 BOM），失败退回本地编码
-          var text = _tryDecodeUtf8(bytes);
-          text ??= latin1.decode(bytes);
-          return text.replaceFirst('\uFEFF', '');
+          return decodeLyricBytes(await f.readAsBytes());
         } catch (_) {
           return null;
         }
@@ -214,12 +211,52 @@ Future<String?> findSidecarLrc(String audioPath) async {
   return null;
 }
 
-String? _tryDecodeUtf8(List<int> bytes) {
-  try {
-    return utf8.decode(bytes);
-  } catch (_) {
-    return null;
+/// 歌词字节解码 —— 手动导入与同名 sidecar 两条路径统一走这里。
+/// 顺序：BOM → 严格 UTF-8 → GBK（酷我等下载源常见）→ 宽松 UTF-8 保底。
+/// 此前 sidecar 路径误用 latin1 兜底，会把 GBK 中文逐字节解成乱码
+/// （外观近似阿拉伯文），与本文件外的 GBK 解码行为不一致。
+String decodeLyricBytes(List<int> bytes) {
+  if (bytes.isEmpty) return '';
+  // 1) 带 BOM：直接按 BOM 指明的编码解，避免被误判
+  if (bytes.length >= 3 &&
+      bytes[0] == 0xEF &&
+      bytes[1] == 0xBB &&
+      bytes[2] == 0xBF) {
+    return _stripBom(utf8.decode(bytes.sublist(3), allowMalformed: true));
   }
+  if (bytes.length >= 2 && bytes[0] == 0xFF && bytes[1] == 0xFE) {
+    return _stripBom(_decodeUtf16(bytes.sublist(2), littleEndian: true));
+  }
+  if (bytes.length >= 2 && bytes[0] == 0xFE && bytes[1] == 0xFF) {
+    return _stripBom(_decodeUtf16(bytes.sublist(2), littleEndian: false));
+  }
+  // 2) 严格 UTF-8（失败会抛 FormatException）
+  try {
+    return _stripBom(utf8.decode(bytes));
+  } on FormatException {
+    // 非 UTF-8，继续尝试中文编码
+  }
+  // 3) GBK
+  try {
+    return _stripBom(gbk.decode(bytes));
+  } catch (_) {
+    // 非 GBK，落到保底
+  }
+  // 4) 宽松 UTF-8：绝不抛错，保证整份歌词不被丢弃
+  return _stripBom(utf8.decode(bytes, allowMalformed: true));
+}
+
+/// 去掉解码后残留的 BOM 字符
+String _stripBom(String s) =>
+    s.isNotEmpty && s.codeUnitAt(0) == 0xFEFF ? s.substring(1) : s;
+
+/// 手工解码 UTF-16（按 UTF-16 码元拼装，Dart 字符串本身即 UTF-16）
+String _decodeUtf16(List<int> b, {required bool littleEndian}) {
+  final units = <int>[];
+  for (var i = 0; i + 1 < b.length; i += 2) {
+    units.add(littleEndian ? b[i] | (b[i + 1] << 8) : (b[i] << 8) | b[i + 1]);
+  }
+  return String.fromCharCodes(units);
 }
 
 /// 供「等待媒体时长就绪」用：把 NaN/0 归一为 null

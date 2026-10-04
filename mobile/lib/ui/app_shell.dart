@@ -1,8 +1,6 @@
 import 'dart:async';
-import 'dart:convert';
 import 'dart:io';
 
-import 'package:fast_gbk/fast_gbk.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -10,6 +8,7 @@ import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:provider/provider.dart';
 
+import '../logic/auto_lyrics.dart';
 import '../models/app_settings.dart';
 import '../models/media_item.dart';
 import '../state/app_state.dart';
@@ -658,7 +657,8 @@ class _ControlBarState extends State<_ControlBar> {
     try {
       // 读字节自行解码：lrc 多为 GBK（酷我等下载源），而 readAsString() 会按
       // 严格 utf-8 解码，遇到 GBK 中文直接抛 FormatException。
-      content = _decodeLrcBytes(await File(path).readAsBytes());
+      // 与同名 sidecar 歌词共用同一个解码器，保证两条路径行为一致。
+      content = decodeLyricBytes(await File(path).readAsBytes());
     } catch (_) {
       st.showToast('无法读取该文件，请选择 LRC 歌词文件');
       return;
@@ -668,22 +668,6 @@ class _ControlBarState extends State<_ControlBar> {
       return;
     }
     st.importLyricsText(content);
-  }
-}
-
-/// lrc 编码兜底：UTF-8 严格解码优先，失败按 GBK（酷我等下载源），
-/// 再失败用宽松 UTF-8（保底不丢整份歌词）。
-String _decodeLrcBytes(List<int> bytes) {
-  if (bytes.isEmpty) return '';
-  try {
-    return utf8.decode(bytes);
-  } on FormatException {
-    // 非 UTF-8，落到 GBK
-  }
-  try {
-    return gbk.decode(bytes);
-  } catch (_) {
-    return utf8.decode(bytes, allowMalformed: true);
   }
 }
 
