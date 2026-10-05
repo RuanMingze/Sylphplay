@@ -297,6 +297,8 @@ function refreshPlayModeUI() {
 function setPlayIcon(playing) {
   const i = $('#play-ico')
   if (i) i.className = playing ? 'fa-solid fa-pause' : 'fa-solid fa-play'
+  // 同步给桌面歌词小窗，用于切换其控制条上的播放/暂停图标
+  if (window.sylph && window.sylph.lyricsPlayState) window.sylph.lyricsPlayState(!!playing)
 }
 function applyAllRates() { if (el.media) el.media.playbackRate = S.settings.defaultSpeed; audioEl.playbackRate = S.settings.defaultSpeed }
 
@@ -1012,14 +1014,32 @@ function bindMediaEvents(m) {
   m.addEventListener('ended', () => {
     const mode = S.settings.playMode
     if (mode === 'one') { m.currentTime = 0; m.play(); return }
-    if (mode === 'off') { m.currentTime = 0; setPlayIcon(false); return }
-    if (S.settings.autoNext) next(); else { m.currentTime = 0; setPlayIcon(false) }
+    // 播放真正结束（不再续播）时，收起桌面歌词，避免停留在最后一句
+    if (mode === 'off') { m.currentTime = 0; setPlayIcon(false); pushDesktopLyric(''); return }
+    if (S.settings.autoNext) next(); else { m.currentTime = 0; setPlayIcon(false); pushDesktopLyric('') }
   })
   m.addEventListener('error', () => toast('无法播放：' + (S.queue[S.current] || {}).name))
 }
 let isSeeking = false
 bindMediaEvents(el.media)
 bindMediaEvents(audioEl)
+
+// 桌面歌词悬停控制条：接收小窗发来的控制指令
+if (window.sylph && window.sylph.onLyricsControl) {
+  window.sylph.onLyricsControl((act) => {
+    if (act === 'toggle') togglePlay()
+    else if (act === 'next') next()
+    else if (act === 'prev') prev()
+  })
+}
+// 关闭行为弹窗勾选「记住」后，同步设置面板开关
+if (window.sylph && window.sylph.onTrayOnCloseState) {
+  window.sylph.onTrayOnCloseState((v) => {
+    S.settings.trayOnClose = !!v.on
+    const c = UI.settingsBody && UI.settingsBody.querySelector('[data-k="trayOnClose"]')
+    if (c) c.checked = !!v.on
+  })
+}
 
 /* ============================================================
    图片查看器
@@ -2017,7 +2037,7 @@ const SETTING_DEFS = [
   { tab: 'general', key: 'autoNext', label: '自动播放下一项', desc: '媒体结束自动切换', render: s => toggle('autoNext', s.autoNext) },
   { tab: 'general', key: 'rememberProgress', label: '记忆播放进度', desc: '从上次暂停位置继续播放', render: s => toggle('rememberProgress', s.rememberProgress) },
   { tab: 'general', key: 'recursiveFolder', label: '递归扫描文件夹', desc: '添加文件夹时包含子目录', render: s => toggle('recursiveFolder', s.recursiveFolder) },
-  { tab: 'general', key: 'trayOnClose', label: '关闭时后台播放', desc: '点关闭最小化到托盘继续播放；关闭即完全退出', render: s => toggle('trayOnClose', s.trayOnClose) },
+  { tab: 'general', key: 'trayOnClose', label: '关闭时后台播放', desc: '关闭窗口时最小化到托盘继续播放；关闭此开关则直接退出。改动后不再弹窗询问', render: s => toggle('trayOnClose', s.trayOnClose) },
   { tab: 'general', key: 'bgAlways', label: '后台永远刷新', desc: '打开高负载程序/频繁切换时避免音乐卡顿断音。注意：常驻后台持续刷新，可能更耗电并降低整体性能', render: s => toggle('bgAlways', s.bgAlways) },
   { tab: 'general', key: 'natQuiet', label: '切换为默认深浅主题', desc: '国庆彩蛋激活中：临时关闭国庆红金配色与横幅，恢复正常深浅主题外观', when: s => s._natActive, render: s => toggle('natQuiet', s.natQuiet) },
   // 图片

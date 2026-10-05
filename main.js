@@ -148,6 +148,7 @@ function ensureLyricsWin() {
   // 页面就绪后再补发样式与当前歌词（此前发送会因 webContents 未就绪而丢失）
   lyricsWin.webContents.on('did-finish-load', () => {
     lyricsWin.webContents.send('lyrics:style', loadLyricsStyle())
+    lyricsWin.webContents.send('lyrics:playstate', lastPlayingState)
     if (lastLyricsText) lyricsWin.webContents.send('lyrics:set', lastLyricsText)
   })
   return lyricsWin
@@ -179,6 +180,16 @@ ipcMain.on('lyrics:fill', (_e, s) => {
   if (lyricsWin && !lyricsWin.isDestroyed()) lyricsWin.webContents.send('lyrics:fill', s)
 })
 ipcMain.on('lyrics-ui-close', () => setDesktopLyricsOn(false))
+// 桌面歌词悬停控制条 → 转发给主窗口执行播放控制
+ipcMain.on('lyrics:control', (_e, act) => {
+  if (win && !win.isDestroyed()) win.webContents.send('lyrics-ctl', act)
+})
+// 主窗口播放状态 → 转发给歌词小窗，用于切换播放/暂停图标
+let lastPlayingState = false
+ipcMain.on('lyrics:playstate', (_e, playing) => {
+  lastPlayingState = !!playing
+  if (lyricsWin && !lyricsWin.isDestroyed()) lyricsWin.webContents.send('lyrics:playstate', lastPlayingState)
+})
 ipcMain.on('lyrics-ui-style', (_e, patch) => {
   const s = Object.assign(loadLyricsStyle(), patch || {})
   saveLyricsStyle(s)
@@ -262,16 +273,50 @@ let isQuitting = false   // 处于显式退出流程时不再拦截关闭
 
 // 「关闭时后台播放（到托盘）」开关：true=关闭最小化到托盘；false=关闭即完全退出
 let trayOnClose = true
+// closeAsk=true 时每次关闭都弹窗询问；用户在弹窗勾选「记住」或在设置里改过开关后置 false
+let closeAsk = true
 function trayOnClosePath() { return path.join(app.getPath('userData'), 'tray-on-close.json') }
 function loadTrayOnClose() {
-  try { return JSON.parse(fs.readFileSync(trayOnClosePath(), 'utf8')).on !== false }
-  catch (e) { return true }
+  try {
+    const j = JSON.parse(fs.readFileSync(trayOnClosePath(), 'utf8'))
+    closeAsk = j.ask !== false
+    return j.on !== false
+  } catch (e) { closeAsk = true; return true }
+}
+function saveCloseCfg() {
+  try { fs.writeFileSync(trayOnClosePath(), JSON.stringify({ on: trayOnClose, ask: closeAsk })) } catch (e) {}
 }
 ipcMain.handle('set-tray-on-close', (_e, on) => {
   trayOnClose = !!on
-  try { fs.writeFileSync(trayOnClosePath(), JSON.stringify({ on: trayOnClose })) } catch (e) {}
+  closeAsk = false   // 设置里手动改过 → 不再弹窗询问
+  saveCloseCfg()
   return trayOnClose
 })
+// 关闭时弹窗询问：直接退出 or 最小化到托盘（可勾选记住）
+async function askCloseAction() {
+  const { response, checkboxChecked } = await dialog.showMessageBox(win, {
+    type: 'question',
+    buttons: ['最小化到托盘', '直接退出'],
+    defaultId: 0,
+    cancelId: 0,
+    checkboxLabel: '记住我的选择（之后可在设置中修改）',
+    checkboxChecked: false,
+    title: 'Sylphplay',
+    message: '关闭窗口时要怎么做？',
+    detail: '最小化到托盘：窗口隐藏，音乐继续播放。\n直接退出：结束播放并退出 Sylphplay。'
+  })
+  trayOnClose = response === 0
+  if (checkboxChecked) { closeAsk = false; saveCloseCfg() }
+  // 同步给设置面板，避免开关与实际行为不一致
+  if (win && !win.isDestroyed()) win.webContents.send('tray-on-close-state', { on: trayOnClose, ask: closeAsk })
+  if (trayOnClose) {
+    win.hide()
+    setMacDockVisible(false)
+    if (tray) tray.setToolTip && tray.setToolTip('Sylphplay · 已最小化到托盘，音乐仍在播放')
+  } else {
+    quitApp()
+  }
+}
 // 系统深浅变化由渲染进程的 prefers-color-scheme 监听处理
 // 视频窗口置顶开关
 ipcMain.on('set-always-on-top', (_e, on) => {
@@ -376,11 +421,15 @@ function createWindow() {
   win.on('close', (e) => {
     saveWindowState()
     if (isQuitting) return
-    if (!trayOnClose) { isQuitting = true; app.quit(); return }   // 关闭即完全退出
-    e.preventDefault()
-    win.hide()
-    setMacDockVisible(false)   // macOS：隐藏到菜单栏后一并隐藏 Dock 图标
-    if (tray) tray.setToolTip && tray.setToolTip('Sylphplay · 已最小化到托盘，音乐仍在播放')
+    e.preventDefault()   // 先拦下，由「询问 / 记住的选择」决定后续
+    if (closeAsk) { askCloseAction(); return }
+    if (trayOnClose) {
+      win.hide()
+      setMacDockVisible(false)   // macOS：隐藏到菜单栏后一并隐藏 Dock 图标
+      if (tray) tray.setToolTip && tray.setToolTip('Sylphplay · 已最小化到托盘，音乐仍在播放')
+    } else {
+      quitApp()
+    }
   })
 
   // 关闭默认菜单（Windows/Linux 保持简洁）；

@@ -51,6 +51,15 @@
     .sw:hover { transform: scale(1.15); }
     .sep { width: 1px; height: 14px; background: rgba(255,255,255,.25); margin: 0 2px; }
     #sizev { color: #fff; font-size: 11px; min-width: 24px; text-align: center; -webkit-user-select: none; }
+    /* 悬停时中间底部出现的播放控制条 */
+    #ctl {
+      position: absolute; bottom: 2px; left: 50%; transform: translateX(-50%); z-index: 3;
+      display: none; align-items: center; gap: 4px;
+      background: rgba(0, 0, 0, 0.6); border: 1px solid rgba(255, 255, 255, 0.15);
+      border-radius: 999px; padding: 3px 9px; -webkit-app-region: no-drag;
+    }
+    #wrap:hover #ctl { display: flex; }
+    #ctl .tb { font-size: 14px; padding: 3px 7px; }
   </style>
 </head>
 <body>
@@ -75,6 +84,11 @@
       <button class="tb" id="center" title="水平居中（x 方向）"><i class="fa-solid fa-align-center"></i></button>
       <span class="sep"></span>
       <button class="tb x" id="cl" title="关闭歌词">✕</button>
+    </div>
+    <div id="ctl">
+      <button class="tb" id="pv" title="上一项"><i class="fa-solid fa-backward-step"></i></button>
+      <button class="tb" id="pp" title="播放 / 暂停"><i class="fa-solid fa-play"></i></button>
+      <button class="tb" id="nx" title="下一项"><i class="fa-solid fa-forward-step"></i></button>
     </div>
   </div>
 
@@ -200,10 +214,20 @@
     // 水平居中（x 方向）
     document.getElementById('center').onclick = () => { if (bridge.lyricsCenter) bridge.lyricsCenter() }
 
+    // 悬停控制条：播放/暂停、上一项、下一项（经主窗口执行）
+    const pp = document.getElementById('pp')
+    document.getElementById('pv').onclick = () => { if (bridge.lyricsControl) bridge.lyricsControl('prev') }
+    document.getElementById('nx').onclick = () => { if (bridge.lyricsControl) bridge.lyricsControl('next') }
+    pp.onclick = () => { if (bridge.lyricsControl) bridge.lyricsControl('toggle') }
+    // 主窗口同步播放状态，切换图标
+    if (bridge.onLyricsPlayState) bridge.onLyricsPlayState((p) => {
+      pp.innerHTML = p ? '<i class="fa-solid fa-pause"></i>' : '<i class="fa-solid fa-play"></i>'
+    })
+
     // --- JS 拖动窗口（任意位置按住拖动，避开工具栏按钮） ---
     let drag = null
     wrap.addEventListener('pointerdown', (e) => {
-      if (e.target.closest('#bar')) return            // 工具栏内的按钮不触发拖动
+      if (e.target.closest('#bar, #ctl')) return            // 工具栏/控制条内的按钮不触发拖动
       drag = { sx: e.screenX, sy: e.screenY, wx: null, wy: null }
       bridge.lyricsPos().then((p) => { if (drag) { drag.wx = p.x; drag.wy = p.y } })
       try { wrap.setPointerCapture(e.pointerId) } catch (_) {}

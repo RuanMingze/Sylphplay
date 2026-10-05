@@ -42,6 +42,13 @@ contextBridge.exposeInMainWorld('sylph', {
   lyricsCenter: () => ipcRenderer.send('lyrics-center'),
   lyricsPos: () => ipcRenderer.invoke('lyrics:pos'),
   lyricsMove: (x, y) => ipcRenderer.send('lyrics:move', x, y),
+  // 桌面歌词悬停控制条：控制指令上行 / 播放状态下行
+  lyricsControl: (act) => ipcRenderer.send('lyrics:control', act),
+  onLyricsControl: (cb) => ipcRenderer.on('lyrics-ctl', (_e, a) => cb(a)),
+  lyricsPlayState: (p) => ipcRenderer.send('lyrics:playstate', p),
+  onLyricsPlayState: (cb) => ipcRenderer.on('lyrics:playstate', (_e, p) => cb(p)),
+  // 关闭行为被弹窗「记住」改写时同步设置开关
+  onTrayOnCloseState: (cb) => ipcRenderer.on('tray-on-close-state', (_e, v) => cb(v)),
   // —— 强制对齐 DLC ——
   dlcStatus: () => ipcRenderer.invoke('dlc:status'),
   dlcDownload: () => ipcRenderer.invoke('dlc:download'),
