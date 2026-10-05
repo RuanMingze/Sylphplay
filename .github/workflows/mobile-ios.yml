@@ -28,6 +28,16 @@ jobs:
       - name: Install dependencies
         run: flutter pub get
 
+      - name: Stub signing team
+        shell: bash
+        run: |
+          P="ios/Runner.xcodeproj/project.pbxproj"
+          # 新版 Flutter/Xcode 强制要求 DEVELOPMENT_TEAM，即便 --no-codesign；
+          # 仅在 CI 注入占位 Team，不影响本地开发。
+          if ! grep -q 'DEVELOPMENT_TEAM' "$P"; then
+            sed -i '' 's/CODE_SIGN_STYLE = Automatic;/&\n\t\t\t\tDEVELOPMENT_TEAM = S123456789;/g' "$P"
+          fi
+
       - name: Build (unsigned)
         run: flutter build ios --release --no-codesign
 
