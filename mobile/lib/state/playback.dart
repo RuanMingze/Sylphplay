@@ -66,11 +66,7 @@ class AudioHandle implements MediaHandle {
   /// 单曲 `setAudioSource` 时系统上一项/下一项按钮会因无队列而失效。
   Future<Duration?> loadPlaylist(List<AudioSource> sources, int initialIndex) {
     _src = null;
-    return player.setAudioSources(
-      sources,
-      initialIndex: initialIndex,
-      initialPosition: Duration.zero,
-    );
+    return player.setAudioSource(ConcatenatingAudioSource(children: sources), initialIndex: initialIndex, initialPosition: Duration.zero);
   }
 
   @override
