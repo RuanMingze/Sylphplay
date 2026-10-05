@@ -5,6 +5,8 @@ import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 import 'package:just_audio/just_audio.dart';
+// 前缀导入：其 MediaItem 与本项目的 models/media_item.dart 同名，避免冲突
+import 'package:just_audio_background/just_audio_background.dart' as jab;
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../logic/auto_lyrics.dart';
@@ -78,6 +80,12 @@ class AppState extends ChangeNotifier {
   bool _pausingFade = false;
   final FadeCtl _fade = FadeCtl();
   StreamSubscription<PlayerState>? _playerSub;
+  /// 队列中「音频项」的下标序列 —— 与 just_audio 播放列表顺序一一对应，
+  /// 用于把系统（锁屏/通知栏）切歌后的播放列表下标映射回 queue 下标
+  List<int> _audioIdx = [];
+  StreamSubscription<int?>? _idxSub;
+  /// 系统切歌进行中：避免 currentIndexStream 与本地加载互相重入
+  bool _sysSwitching = false;
 
   int? _shuffleBagPos;
   List<int>? _shuffleBag;
@@ -124,6 +132,7 @@ class AppState extends ChangeNotifier {
     queuePanelOpen = queue.isNotEmpty; // 队列有内容则自动展开
     _startTicker();
     _bindPlayerState();
+    _bindPlayerIndex();
     _applySpeed();
     notifyListeners();
   }
@@ -148,9 +157,26 @@ class AppState extends ChangeNotifier {
     });
   }
 
+  /// 系统切歌同步：锁屏 / 控制中心 / 通知栏点「上一项 / 下一项」时，
+  /// just_audio 会在内部播放列表里前进/后退并自动播放。
+  /// 这里把播放列表下标映射回 queue 下标，刷新 UI / 歌词 / 进度。
+  void _bindPlayerIndex() {
+    _idxSub?.cancel();
+    _idxSub = audioHandle.player.currentIndexStream.listen((pi) {
+      if (pi == null || _sysSwitching) return;
+      if (media is! AudioHandle) return;
+      if (pi < 0 || pi >= _audioIdx.length) return;
+      final qi = _audioIdx[pi];
+      if (qi == current) return;
+      _sysSwitching = true;
+      loadMediaNow(qi, keepSource: true).whenComplete(() => _sysSwitching = false);
+    });
+  }
+
   @override
   void dispose() {
     _playerSub?.cancel();
+    _idxSub?.cancel();
     _ticker?.cancel();
     _progressTimer?.cancel();
     _toastTimer?.cancel();
@@ -418,23 +444,76 @@ class AppState extends ChangeNotifier {
     }
   }
 
-  Future<void> loadMediaNow(int idx) async {
+  /// 为音频项构造带 MediaItem 标签的音源（通知栏/锁屏标题、封面依赖它）
+  AudioSource _audioSourceFor(MediaItem it) {
+    final tag = jab.MediaItem(id: it.path, title: it.name, album: 'Sylphplay');
+    return it.url
+        ? AudioSource.uri(Uri.parse(it.path), tag: tag)
+        : AudioSource.file(it.path, tag: tag);
+  }
+
+  /// 按播放模式决定「音频播放列表」的顺序（锁屏切歌与自动续播都按它走）
+  ///
+  /// - off：只放当前这一首 —— 播完不自动下一首（保持原有语义）
+  /// - shuffle / shuffleSmart：当前曲在前，其余随机
+  /// - one / all / sequence：按队列原顺序（单曲循环由 LoopMode 负责）
+  List<int> _audioOrderFor(int curQueueIdx) {
+    final audio = [
+      for (var i = 0; i < queue.length; i++)
+        if (queue[i].type == MediaType.audio) i
+    ];
+    final mode = settings.playMode;
+    if (mode == PlayMode.off) return [curQueueIdx];
+    if (mode == PlayMode.shuffle || mode == PlayMode.shuffleSmart) {
+      final rest = [...audio]..remove(curQueueIdx);
+      rest.shuffle(math.Random());
+      return [curQueueIdx, ...rest];
+    }
+    return audio;
+  }
+
+  /// 播放模式 → just_audio 循环模式（播放器自身负责续播/循环）
+  void _applyAudioLoopMode() {
+    final mode = settings.playMode;
+    final lm = mode == PlayMode.one
+        ? LoopMode.one
+        : (mode == PlayMode.all ? LoopMode.all : LoopMode.off);
+    audioHandle.player.setLoopMode(lm);
+  }
+
+  Future<void> loadMediaNow(int idx, {bool keepSource = false}) async {
     if (idx < 0 || idx >= queue.length) {
       await stopAll();
       showEmpty();
       return;
     }
-    await _stopCurrent();
+    // keepSource：由系统（锁屏）切歌触发，播放器已自行换曲并开始播放，
+    // 不能再暂停/重建播放列表，否则会把刚起的播放打断
+    if (keepSource) {
+      media = null;
+      _endedFired = false;
+    } else {
+      await _stopCurrent();
+    }
     final item = queue[idx];
     current = idx;
     final type = item.type;
 
     if (type == MediaType.audio) {
       final h = audioHandle;
-      try {
-        await h.load(item.path, isUrl: item.url, title: item.name);
-      } catch (_) {
-        showToast('无法播放：${item.name}');
+      if (!keepSource) {
+        // 把「音频队列」按播放模式交给播放器：系统上一项/下一项才有内容可切，
+        // 自动续播也交给播放器（见 _applyAudioLoopMode），避免与本地点按重复跳曲
+        _audioIdx = _audioOrderFor(idx);
+        final sources = [for (final i in _audioIdx) _audioSourceFor(queue[i])];
+        var initial = _audioIdx.indexOf(idx);
+        if (initial < 0) initial = 0;
+        try {
+          await h.loadPlaylist(sources, initial);
+        } catch (_) {
+          showToast('无法播放：${item.name}');
+        }
+        _applyAudioLoopMode();
       }
       media = h;
       _applySpeed();
@@ -694,6 +773,8 @@ class AppState extends ChangeNotifier {
     settings.playMode = m;
     await saveSettings();
     if (m == PlayMode.shuffleSmart) _resetShuffleBag();
+    // 同步播放器循环模式，使自动续播行为与新设置一致
+    _applyAudioLoopMode();
     showToast('播放模式：${m.label}');
     notifyListeners();
   }
@@ -743,6 +824,10 @@ class AppState extends ChangeNotifier {
 
   Future<void> _onEnded() async {
     _endedFired = true;
+    // 音频：续播 / 单曲循环 / 列表循环全部由 just_audio 自己按 LoopMode 完成
+    // （这样锁屏与 App 内的切歌走同一条路径，不会重复跳曲）；
+    // 队列中的下标变化由 _bindPlayerIndex 统一同步回 UI。
+    if (media is AudioHandle) return;
     final mode = settings.playMode;
     if (mode == PlayMode.one) {
       await media?.seekSec(0);

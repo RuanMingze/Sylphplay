@@ -58,6 +58,21 @@ class AudioHandle implements MediaHandle {
     return player.setAudioSource(src);
   }
 
+  /// 以「整条音频队列」为播放列表加载。
+  ///
+  /// just_audio_background 只有在播放器持有「可前后切换的列表」时，
+  /// 才会向 iOS 锁屏/控制中心、Android 通知栏提供「上一项/下一项」，
+  /// 并由播放器自行驱动切歌（我们通过 currentIndexStream 同步回队列）。
+  /// 单曲 `setAudioSource` 时系统上一项/下一项按钮会因无队列而失效。
+  Future<Duration?> loadPlaylist(List<AudioSource> sources, int initialIndex) {
+    _src = null;
+    return player.setAudioSources(
+      sources,
+      initialIndex: initialIndex,
+      initialPosition: Duration.zero,
+    );
+  }
+
   @override
   Future<void> play() => player.play();
 
