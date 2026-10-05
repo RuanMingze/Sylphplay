@@ -67,4 +67,4 @@ assets/                  # 图标等静态资源
 
 ## 发布产物示例
 
-`Sylphplay-1.0.0-Android.apk`、`Sylphplay-1.0.0-iOS.ipa`。
+`Sylphplay-1.0.2-Android.apk`、`Sylphplay-1.0.2-iOS.ipa`。

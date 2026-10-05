@@ -46,7 +46,7 @@ Sylphplay **不是**一个音乐播放器 —— 它同时面向**音频、视�
 | 桌面版   | Electron 33 + 原生前端    | Windows / macOS / Linux   | 仓库根目录    |
 | 手机版   | Flutter（Dart）         | Android / iOS             | [mobile/](mobile/) |
 
-> 发布产物示例：`Sylphplay-1.0.0-Windows-x64-Setup.exe`、`Sylphplay-1.0.0-Android.apk`、`Sylphplay-1.0.0-iOS.ipa`。
+> 发布产物示例：`Sylphplay-1.0.2-Windows-x64-Setup.exe`、`Sylphplay-1.0.2-Android.apk`、`Sylphplay-1.0.2-iOS.ipa`。
 
 ***
 

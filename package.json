@@ -1,7 +1,7 @@
 {
   "name": "sylphplay",
   "productName": "Sylphplay",
-  "version": "1.0.0",
+  "version": "1.0.2",
   "description": "Sylphplay — 多媒体播放器",
   "main": "main.js",
   "author": {
