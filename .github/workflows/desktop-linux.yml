@@ -11,7 +11,7 @@ permissions:
 
 jobs:
   build:
-    name: Build Linux package
+    name: Build Linux packages
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -31,7 +31,10 @@ jobs:
       - name: Install packaging tools
         run: |
           sudo apt-get update
-          sudo apt-get install -y --no-install-recommends fakeroot binutils xz-utils
+          sudo apt-get install -y --no-install-recommends \
+            fakeroot binutils xz-utils \
+            patchelf zlib1g-dev libncurses-dev gcc g++ \
+            rpm
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
@@ -39,9 +42,15 @@ jobs:
       - name: Build
         run: pnpm dist:linux
 
+      - name: List dist
+        run: ls -la dist/
+
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
           name: sylphplay-linux-x64
-          path: dist/*.deb
+          path: |
+            dist/*.deb
+            dist/*.rpm
+            dist/*.AppImage
           if-no-files-found: error

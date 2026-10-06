@@ -20,6 +20,7 @@ const IS_DEV = process.argv.includes('--dev')
 // 「强制对齐 DLC」与「设为默认打开方式」仅 Windows 可用（依赖 Windows 专用引擎 / assoc-helper.exe），
 // 其他平台隐藏入口并由 IPC 守卫兜底。
 const IS_WIN = process.platform === 'win32'
+const IS_X86 = process.arch === 'ia32'
 const IS_MAC = process.platform === 'darwin'
 const IS_LINUX = process.platform === 'linux'
 
@@ -567,7 +568,7 @@ ipcMain.handle('classify-url', (_e, url) => {
 ipcMain.handle('national-flag', () => process.argv.includes('--101'))
 ipcMain.handle('set-default-app', async () => {
   const { execFile } = require('child_process')
-  if (!IS_WIN) return { ok: false, unsupported: true }                     // 关联助手仅 Windows 版提供
+  if (!IS_WIN || IS_X86) return { ok: false, unsupported: true }   // 关联助手仅 Windows x64 版提供
   if (!app.isPackaged) return { ok: false, dev: true }                    // 开发环境不识别
   const exe = process.execPath                                             // 打包后即 Sylphplay.exe
   const helper = path.join(process.resourcesPath, 'assoc-helper.exe')      // extraResources 打包位置
@@ -739,7 +740,7 @@ function cleanDlcTmp(zipPath) {
 let dlcBusy = false
 let dlcCancelled = false
 ipcMain.handle('dlc:download', async () => {
-  if (!IS_WIN) return { ok: false, unsupported: true, message: '强制对齐功能仅支持 Windows' }
+  if (!IS_WIN || IS_X86) return { ok: false, unsupported: true, message: '强制对齐功能仅支持 Windows x64（.NET 10 已砍 win-x86 RID）' }
   if (dlcBusy) return { ok: false, busy: true, message: '下载进行中，请稍候' }
   dlcBusy = true
   dlcCancelled = false

@@ -6,6 +6,7 @@ const settingsKey = 'sylph:settings'
 
 // 当前平台：DLC（强制对齐）与「设为默认打开方式」为 Windows 专属，其他平台隐藏入口
 const IS_WIN = window.sylph.platform === 'win32'
+const IS_X86 = window.sylph.arch === 'ia32'
 
 const DEFAULT_SETTINGS = {
   theme: 'system',   // system(跟随系统) | dark | light
@@ -2063,7 +2064,7 @@ const SETTING_DEFS = [
   { tab: 'experimental', key: 'speedMax', label: '倍速滑块·最大值', desc: '滑块拖动到最右的速度', render: s => `<div class="exp-io">× <input class="set-text rng-speedmax" data-k="speedMax" type="number" min="0.05" step="0.05" value="${S.settings.speedMax}"></div>` },
   { tab: 'experimental', key: 'expLyricsFill', label: '实验：歌词逐字渐变填充', desc: '歌词逐条播放，当前行文字自左向右逐字填充高亮（非卡拉OK歌词也生效）', render: s => toggle('expLyricsFill', s.expLyricsFill) },
   { tab: 'experimental', key: 'expAutoLyrics', label: '实验：自动寻找缺失歌词', desc: '本地歌词缺失时，联网从 LRCLIB（免费、无需账户）查找，且要求歌词版本与歌曲时长匹配；未找到或请求失败则保持默认频谱页', render: s => toggle('expAutoLyrics', s.expAutoLyrics) },
-  { tab: 'experimental', key: 'dlc', label: '实验：强制对齐 DLC', desc: '字级歌词强制对齐工具（Python 引擎），下载后即可在主播放器中使用', when: () => IS_WIN, render: () => `
+  { tab: 'experimental', key: 'dlc', label: '实验：强制对齐 DLC', desc: '字级歌词强制对齐工具（Python 引擎），下载后即可在主播放器中使用', when: () => IS_WIN && !IS_X86, render: () => `
     <div class="dlc-box">
       <div id="dlc-control" class="dlc-control"></div>
       <div id="dlc-progress" class="dlc-progress" hidden></div>
@@ -2093,7 +2094,7 @@ function openSettings() {
         <div><div class="set-label">${d.label}</div>${d.desc ? `<div class="set-desc">${d.desc}</div>` : ''}</div>
         <div class="set-control">${d.render(S.settings)}</div>
       </div>`).join('')
-    const extra = (id === 'general' && IS_WIN) ? `
+    const extra = ((id === 'general' && IS_WIN && !IS_X86)) ? `
       <div class="set-row">
         <div><div class="set-label">设为默认打开方式</div><div class="set-desc">用 Sylphplay 打开 mp4 / png / mp3 等媒体文件</div></div>
         <div class="set-control"><button class="btn primary sm" id="set-default-app"><i class="fa-solid fa-link"></i> 立即设置</button></div>
@@ -2144,7 +2145,7 @@ function currentThemeName() {
 async function refreshAlignButton() {
   const btn = document.getElementById('btn-align')
   if (!btn) return
-  if (!IS_WIN) { btn.hidden = true; return }   // 非 Windows 无 DLC，永不显示该按钮
+  if (!IS_WIN || IS_X86) { btn.hidden = true; return }   // x86 也隐藏：.NET 10 已砍 win-x86 RID
   let ready = false
   try { const st = await window.sylph.alignStatus(); ready = !!(st && st.ready) } catch (e) {}
   btn.hidden = !ready

@@ -11,8 +11,16 @@ permissions:
 
 jobs:
   build:
-    name: Build Windows installer
+    name: Build Windows ${{ matrix.arch }}
     runs-on: windows-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: x64
+            dotnet: true
+          - arch: ia32
+            dotnet: false
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -28,7 +36,8 @@ jobs:
           version: 12
           run_install: false
 
-      - name: Setup .NET
+      - name: Setup .NET (x64 only, for assoc-helper)
+        if: ${{ matrix.dotnet }}
         uses: actions/setup-dotnet@v4
         with:
           dotnet-version: '10.x'
@@ -36,12 +45,17 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Build
-        run: pnpm dist:win
+      - name: Build x64 (with assoc-helper)
+        if: ${{ matrix.dotnet }}
+        run: pnpm dist:win-x64
+
+      - name: Build ia32 (no assoc-helper — .NET 10 dropped win-x86 RID)
+        if: ${{ !matrix.dotnet }}
+        run: pnpm dist:win-ia32
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
-          name: sylphplay-windows-x64
+          name: sylphplay-windows-${{ matrix.arch }}
           path: dist/*.exe
           if-no-files-found: error
