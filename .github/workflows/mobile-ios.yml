@@ -1,5 +1,4 @@
 name: Mobile · iOS
-
 on:
   push:
     tags:
