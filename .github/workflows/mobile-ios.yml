@@ -32,11 +32,21 @@ jobs:
         shell: bash
         run: |
           P="ios/Runner.xcodeproj/project.pbxproj"
-          # 新版 Flutter/Xcode 强制要求 DEVELOPMENT_TEAM，即便 --no-codesign；
-          # 仅在 CI 注入占位 Team，不影响本地开发。
-          if ! grep -q 'DEVELOPMENT_TEAM' "$P"; then
-            sed -i '' 's/CODE_SIGN_STYLE = Automatic;/&\n\t\t\t\tDEVELOPMENT_TEAM = S123456789;/g' "$P"
-          fi
+          python3 -c "
+import re, sys
+p = '$P'
+s = open(p).read()
+# 每个 CODE_SIGN_STYLE = Automatic; 所在行后追加 DEVELOPMENT_TEAM 占位
+s2 = re.sub(
+    r'(CODE_SIGN_STYLE = Automatic;)',
+    r'\1\n\t\t\t\tDEVELOPMENT_TEAM = S123456789;',
+    s,
+)
+if 'DEVELOPMENT_TEAM' not in s2:
+    s2 += '\n/* stub */\n'
+open(p, 'w').write(s2)
+print('injected DEVELOPMENT_TEAM')
+"
 
       - name: Build (unsigned)
         run: flutter build ios --release --no-codesign
