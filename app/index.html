@@ -225,7 +225,25 @@
   </div>
 
   <!-- 拖放遮罩提示 -->
-  <div id="drop-overlay" class="drop-overlay">
+  <!-- 自定义关闭弹窗（替代原生 dialog.showMessageBox，不走 Tauri 那套） -->
+<div id="close-mask" class="modal-mask">
+  <div class="modal">
+    <div class="modal-head">关闭窗口</div>
+    <div class="modal-body" style="padding: 14px 18px;">
+      <p style="margin: 0; font-size: 14px; line-height: 1.6; color: var(--text);">关闭窗口时要怎么做？</p>
+      <p style="margin: 8px 0 0; font-size: 12.5px; line-height: 1.6; color: var(--text-dim);">最小化到托盘：窗口隐藏，音乐继续播放。<br>直接退出：结束播放并退出 Sylphplay。</p>
+      <label style="display: inline-flex; align-items: center; gap: 8px; margin-top: 14px; font-size: 12.5px; color: var(--text-dim); cursor: pointer;">
+        <input type="checkbox" id="close-remember" style="accent-color: var(--accent);">
+        记住我的选择（之后可在设置中修改）
+      </label>
+    </div>
+    <div class="modal-foot" style="justify-content: flex-end; gap: 8px;">
+      <button class="btn" id="close-tray">最小化到托盘</button>
+      <button class="btn btn-primary" id="close-quit">直接退出</button>
+    </div>
+  </div>
+</div>
+<div id="drop-overlay" class="drop-overlay">
     <div class="drop-box">松开以加入播放队列</div>
   </div>
 

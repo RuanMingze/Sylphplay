@@ -50,6 +50,9 @@ contextBridge.exposeInMainWorld('sylph', {
   onLyricsPlayState: (cb) => ipcRenderer.on('lyrics:playstate', (_e, p) => cb(p)),
   // 关闭行为被弹窗「记住」改写时同步设置开关
   onTrayOnCloseState: (cb) => ipcRenderer.on('tray-on-close-state', (_e, v) => cb(v)),
+  // 自定义关闭弹窗（替代原生 dialog.showMessageBox）
+  onAskClose: (cb) => ipcRenderer.on('ask-close', () => cb()),
+  closeChoice: (payload) => ipcRenderer.send('close-choice', payload),
   // —— 强制对齐 DLC ——
   dlcStatus: () => ipcRenderer.invoke('dlc:status'),
   dlcDownload: () => ipcRenderer.invoke('dlc:download'),

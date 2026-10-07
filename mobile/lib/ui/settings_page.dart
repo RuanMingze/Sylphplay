@@ -543,6 +543,65 @@ class _SettingsPageState extends State<SettingsPage> {
     T value,
     ValueChanged<T> onChanged,
   ) {
+    // iOS：换 CupertinoPicker（系统原生轮子风格）；其它平台保留 Flutter DropdownButton
+    if (Platform.isIOS) {
+      final idx = options.indexWhere((o) => o.value == value).clamp(0, options.length - 1);
+      return GestureDetector(
+        onTap: () async {
+          var sel = idx;
+          await showCupertinoModalPopup<void>(
+            context: context,
+            builder: (_) => Container(
+              height: 260,
+              color: CupertinoColors.systemBackground.resolveFrom(context),
+              child: SafeArea(
+                top: false,
+                child: Column(
+                  children: [
+                    Align(
+                      alignment: Alignment.centerRight,
+                      child: CupertinoButton(
+                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+                        onPressed: () => Navigator.pop(context),
+                        child: const Text('完成'),
+                      ),
+                    ),
+                    Expanded(
+                      child: CupertinoPicker(
+                        itemExtent: 34,
+                        scrollController: FixedExtentScrollController(initialItem: sel),
+                        onSelectedItemChanged: (i) => sel = i,
+                        children: [
+                          for (final o in options)
+                            Center(child: Text(o.label, style: const TextStyle(fontSize: 16))),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          );
+          if (Navigator.of(context).mounted) onChanged(options[sel].value);
+        },
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+          decoration: BoxDecoration(
+            color: c.surface,
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(color: c.border),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(options[idx].label, style: TextStyle(fontSize: 12.5, color: c.text)),
+              const SizedBox(width: 4),
+              FaIcon(FontAwesomeIcons.chevronDown, size: 11, color: c.textDim),
+            ],
+          ),
+        ),
+      );
+    }
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10),
       decoration: BoxDecoration(

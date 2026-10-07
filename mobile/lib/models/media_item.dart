@@ -37,6 +37,8 @@ class MediaItem {
   final int size;
   /// 是否为远程 URL 条目（url: true），影响是否走本地文件路径
   final bool url;
+  /// 用户手动关联的 sidecar 歌词（LRC）绝对路径；null 表示未关联
+  final String? lrcPath;
 
   const MediaItem({
     required this.path,
@@ -44,7 +46,17 @@ class MediaItem {
     required this.type,
     this.size = 0,
     this.url = false,
+    this.lrcPath,
   });
+
+  MediaItem copyWith({String? path, String? name, MediaType? type, int? size, bool? url, String? lrcPath}) => MediaItem(
+    path: path ?? this.path,
+    name: name ?? this.name,
+    type: type ?? this.type,
+    size: size ?? this.size,
+    url: url ?? this.url,
+    lrcPath: lrcPath ?? this.lrcPath,
+  );
 
   Map<String, dynamic> toJson() => {
         'path': path,
@@ -52,6 +64,7 @@ class MediaItem {
         'type': type.name,
         'size': size,
         'url': url,
+        if (lrcPath != null) 'lrcPath': lrcPath,
       };
 
   static MediaItem? fromJson(dynamic raw) {
@@ -67,6 +80,7 @@ class MediaItem {
       type: type,
       size: (raw['size'] is num) ? (raw['size'] as num).toInt() : 0,
       url: raw['url'] == true,
+      lrcPath: raw['lrcPath'] is String ? raw['lrcPath'] as String : null,
     );
   }
 

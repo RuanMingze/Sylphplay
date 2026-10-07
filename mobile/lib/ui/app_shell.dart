@@ -667,7 +667,8 @@ class _ControlBarState extends State<_ControlBar> {
       st.showToast('该文件不像 LRC 歌词，已取消导入');
       return;
     }
-    st.importLyricsText(content);
+    // 与当前媒体关联（持久化到 queue）
+    await st.associateLyricForCurrent(path);
   }
 }
 

@@ -1033,6 +1033,24 @@ if (window.sylph && window.sylph.onLyricsControl) {
     else if (act === 'prev') prev()
   })
 }
+// —— 自定义关闭弹窗（替代原生 dialog.showMessageBox）——
+(function initCloseModal() {
+  const mask = document.getElementById('close-mask')
+  const remember = document.getElementById('close-remember')
+  const trayBtn = document.getElementById('close-tray')
+  const quitBtn = document.getElementById('close-quit')
+  if (!mask || !trayBtn || !quitBtn) return
+  const open = () => { remember.checked = false; mask.classList.add('open') }
+  const close = () => mask.classList.remove('open')
+  const onPick = (action) => {
+    const r = remember && remember.checked
+    if (window.sylph && window.sylph.closeChoice) window.sylph.closeChoice({ action, remember: r })
+    close()
+  }
+  trayBtn.addEventListener('click', () => onPick('tray'))
+  quitBtn.addEventListener('click', () => onPick('quit'))
+  if (window.sylph && window.sylph.onAskClose) window.sylph.onAskClose(open)
+})()
 // 关闭行为弹窗勾选「记住」后，同步设置面板开关
 if (window.sylph && window.sylph.onTrayOnCloseState) {
   window.sylph.onTrayOnCloseState((v) => {

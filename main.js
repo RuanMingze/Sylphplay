@@ -294,21 +294,11 @@ ipcMain.handle('set-tray-on-close', (_e, on) => {
   return trayOnClose
 })
 // 关闭时弹窗询问：直接退出 or 最小化到托盘（可勾选记住）
-async function askCloseAction() {
-  const { response, checkboxChecked } = await dialog.showMessageBox(win, {
-    type: 'question',
-    buttons: ['最小化到托盘', '直接退出'],
-    defaultId: 0,
-    cancelId: 0,
-    checkboxLabel: '记住我的选择（之后可在设置中修改）',
-    checkboxChecked: false,
-    title: 'Sylphplay',
-    message: '关闭窗口时要怎么做？',
-    detail: '最小化到托盘：窗口隐藏，音乐继续播放。\n直接退出：结束播放并退出 Sylphplay。'
-  })
-  trayOnClose = response === 0
-  if (checkboxChecked) { closeAsk = false; saveCloseCfg() }
-  // 同步给设置面板，避免开关与实际行为不一致
+// 不走 dialog.showMessageBox（那是原生 Tauri 风格），改用 WebView 内自定义弹窗
+ipcMain.on('close-choice', (_e, payload) => {
+  if (!payload || !payload.action) return
+  trayOnClose = payload.action === 'tray'
+  if (payload.remember) { closeAsk = false; saveCloseCfg() }
   if (win && !win.isDestroyed()) win.webContents.send('tray-on-close-state', { on: trayOnClose, ask: closeAsk })
   if (trayOnClose) {
     win.hide()
@@ -317,6 +307,9 @@ async function askCloseAction() {
   } else {
     quitApp()
   }
+})
+function askCloseAction() {
+  if (win && !win.isDestroyed()) win.webContents.send('ask-close')
 }
 // 系统深浅变化由渲染进程的 prefers-color-scheme 监听处理
 // 视频窗口置顶开关

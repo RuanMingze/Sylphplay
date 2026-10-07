@@ -289,7 +289,17 @@ class AppState extends ChangeNotifier {
 
   Future<void> removeFromQueue(int i) async {
     if (i < 0 || i >= queue.length) return;
+    final removed = queue[i];
     queue.removeAt(i);
+    // 关联的 sidecar LRC 若是应用私有临时文件（Android SAF 复制进来的），一并清理
+    if (removed.lrcPath != null) {
+      try {
+        final p = removed.lrcPath!;
+        if (p.contains('/cache/') || p.contains('/files/') || p.contains('TemporaryDirectory')) {
+          await File(p).delete().catchError((_) {});
+        }
+      } catch (_) {}
+    }
     if (queue.isEmpty) {
       await stopAll();
       showEmpty();
@@ -884,7 +894,8 @@ class AppState extends ChangeNotifier {
     showToast('已导入歌词');
   }
 
-  /// 自动查找歌词：先本地同名师，缺失且开启实验「自动寻找歌词」时联网兜底（LRCLIB）
+  /// 自动查找歌词：先用户手动关联的 sidecar（持久化在 lrcPath），
+  /// 再本地同名师，缺失且开启实验「自动寻找歌词」时联网兜底（LRCLIB）
   Future<void> autoLoadLyrics(MediaItem item) async {
     if (item.type != MediaType.audio) return;
     clearLyrics();
@@ -893,6 +904,14 @@ class AppState extends ChangeNotifier {
     if (cached != null) {
       setLyrics(cached);
       return;
+    }
+    // 用户手动关联的 sidecar（持久化在 MediaItem.lrcPath）
+    if (item.lrcPath != null) {
+      try {
+        final b = await File(item.lrcPath!).readAsBytes();
+        final content = decodeLyricBytes(b);
+        if (content.isNotEmpty) { setLyrics(content); return; }
+      } catch (_) {}
     }
     try {
       final content = await findSidecarLrc(item.path);
@@ -912,6 +931,18 @@ class AppState extends ChangeNotifier {
         showToast('已联网获取歌词');
       }
     }
+  }
+
+  /// 用户选择 LRC 文件与当前媒体关联：更新 queue 条目 + 持久化
+  Future<void> associateLyricForCurrent(String lrcPath) async {
+    if (current < 0 || current >= queue.length) return;
+    queue[current] = queue[current].copyWith(lrcPath: lrcPath);
+    await _saveQueue();
+    notifyListeners();
+    // 立刻对当前生效
+    final content = decodeLyricBytes(await File(lrcPath).readAsBytes());
+    setLyrics(content);
+    showToast('已关联歌词');
   }
 
   /// 等待当前媒体时长就绪（最多 4s），供自动歌词做严谨的时长匹配
