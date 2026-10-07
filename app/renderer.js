@@ -2112,11 +2112,21 @@ function openSettings() {
         <div><div class="set-label">${d.label}</div>${d.desc ? `<div class="set-desc">${d.desc}</div>` : ''}</div>
         <div class="set-control">${d.render(S.settings)}</div>
       </div>`).join('')
-    const extra = ((id === 'general' && IS_WIN && !IS_X86)) ? `
+    const extra = id === 'general' ? `
+      <div class="set-row">
+        <div><div class="set-label">应用更新</div><div class="set-desc" id="update-status-text">当前版本：${window.sylph.platform ? '检测中…' : '未知'} </div></div>
+        <div class="set-control">
+          <div class="update-actions">
+            <button class="btn primary sm" id="check-update-btn" type="button"><i class="fa-solid fa-arrows-rotate"></i> 检查更新</button>
+            <button class="btn ghost sm" id="update-download-btn" type="button" hidden>立即下载</button>
+          </div>
+        </div>
+      </div>
+      ${IS_WIN && !IS_X86 ? `
       <div class="set-row">
         <div><div class="set-label">设为默认打开方式</div><div class="set-desc">用 Sylphplay 打开 mp4 / png / mp3 等媒体文件</div></div>
         <div class="set-control"><button class="btn primary sm" id="set-default-app"><i class="fa-solid fa-link"></i> 立即设置</button></div>
-      </div>` : ''
+      </div>` : ''}` : ''
     return `<div class="set-panel" data-panel="${id}" ${id === settingsTab ? '' : 'hidden'}>${rows}${extra}</div>`
   }).join('')
 
@@ -2151,6 +2161,267 @@ function openSettings() {
   // 强制对齐 DLC：初始化状态 + 事件绑定
   initDlcControl()
   initAlignButton()
+  const updateStatusText = document.getElementById('update-status-text')
+  if (updateStatusText) {
+    const systemName = window.sylph.platform === 'win32' ? 'Windows' : window.sylph.platform === 'darwin' ? 'macOS' : window.sylph.platform === 'linux' ? 'Linux' : window.sylph.platform || '未知平台'
+    const archName = window.sylph.arch || ''
+    window.sylph.getVersion().then(v => {
+      if (updateStatusText) updateStatusText.textContent = `当前版本：${v} · ${systemName} ${archName}`.trim()
+    }).catch(() => {
+      if (updateStatusText) updateStatusText.textContent = `当前系统：${systemName} ${archName}`.trim()
+    })
+  }
+  const updateUiState = { inProgress: false, installerPath: '', updatePayload: null }
+
+  const getUpdateUiRefs = () => ({
+    check: document.getElementById('check-update-btn'),
+    download: document.getElementById('update-download-btn'),
+    status: document.getElementById('update-status-text')
+  })
+
+  const lockUpdateAction = (inProgress) => {
+    updateUiState.inProgress = !!inProgress
+    const { check, download } = getUpdateUiRefs()
+    if (check) check.disabled = !!inProgress
+    if (download && inProgress && download.textContent !== '立即更新') {
+      download.disabled = true
+    }
+  }
+
+  const renderUpdateStatus = (msg) => {
+    const { status } = getUpdateUiRefs()
+    if (status) status.textContent = msg
+  }
+
+  const isDebugTriggerEvent = (event) => {
+    if (!event) return false
+    const ctrl = !!event.ctrlKey
+    const shift = !!event.shiftKey
+    const targetEl = event.target && event.target.closest ? event.target.closest('#update-download-btn') : null
+    const currentEl = event.currentTarget && event.currentTarget.id === 'update-download-btn' ? event.currentTarget : null
+    const matches = !!(currentEl || targetEl)
+    console.log('[update-debug] trigger check', {
+      ctrl,
+      shift,
+      targetId: event.target && event.target.id,
+      currentId: event.currentTarget && event.currentTarget.id,
+      matches,
+      text: (event.currentTarget && event.currentTarget.textContent) || (event.target && event.target.textContent) || '',
+      html: (event.currentTarget && event.currentTarget.outerHTML && event.currentTarget.outerHTML.slice(0, 120)) || ''
+    })
+    if (!ctrl || !shift) return false
+    return matches
+  }
+
+  const setDebugUpdateMenu = (download) => {
+    if (!download) return
+    const parent = download.parentElement
+    if (!parent) return
+
+    let menu = parent.querySelector('.update-debug-menu')
+    if (!menu) {
+      menu = document.createElement('div')
+      menu.className = 'update-debug-menu'
+      menu.hidden = true
+      menu.innerHTML = '<button type="button" class="btn ghost sm update-debug-upload">上传本地文件</button>'
+      parent.appendChild(menu)
+    }
+
+    let input = parent.querySelector('.update-debug-input')
+    if (!input) {
+      input = document.createElement('input')
+      input.type = 'file'
+      input.className = 'update-debug-input'
+      input.accept = '.exe,.msi,.dmg,.AppImage,.deb,.rpm,.zip'
+      input.hidden = true
+      parent.appendChild(input)
+    }
+
+    menu.querySelector('.update-debug-upload').onclick = () => {
+      input.value = ''
+      input.click()
+      menu.hidden = true
+    }
+
+    input.onchange = async () => {
+      const file = input.files && input.files[0]
+      if (!file) return
+      const installerPath = file.path || file.name
+      renderUpdateStatus(`已选本地安装包：${file.name}`)
+      try {
+        const r = await window.sylph.installDownloadedUpdate(installerPath)
+        if (!r.ok) toast(r.message || '本地安装包启动失败')
+        else toast('已启动本地安装包更新')
+        if (download) {
+          download.dataset.installerPath = installerPath
+          setUpdateButtonText(download, '立即更新')
+        }
+      } catch (e) {
+        toast('本地安装包启动失败')
+      }
+      input.value = ''
+    }
+  }
+
+  const setUpdateButtonText = (download, text) => {
+    if (!download) return
+    const safeText = String(text || '').trim()
+    download.textContent = safeText
+    setDebugUpdateMenu(download)
+  }
+
+  const updateBtnReady = () => {
+    const { download } = getUpdateUiRefs()
+    if (!download) return
+    download.disabled = false
+    setUpdateButtonText(download, '立即更新')
+    download.hidden = false
+  }
+
+  const updateBtnDownloading = (progress = {}) => {
+    const { download } = getUpdateUiRefs()
+    if (!download) return
+    const total = Number(progress.total) || 0
+    const downloaded = Number(progress.downloaded) || 0
+    const percent = Number(progress.percent) || 0
+    download.disabled = true
+    if (total > 0 && percent >= 0) {
+      setUpdateButtonText(download, `下载中 ${percent}%`)
+      return
+    }
+    setUpdateButtonText(download, `下载中 ${fmtBytes(downloaded)}`)
+  }
+
+  const bindUpdateButtons = () => {
+    const { check, download } = getUpdateUiRefs()
+
+    if (check) {
+      check.onclick = async () => {
+        if (updateUiState.inProgress) return
+        check.disabled = true
+        renderUpdateStatus('正在检查更新…')
+        try {
+          const result = await window.sylph.checkForUpdates()
+          if (!result.ok) {
+            renderUpdateStatus('检查更新失败：' + (result.error || '未知错误'))
+            return
+          }
+          const label = `${result.platformLabel || '当前系统'} · 当前 ${result.currentVersion}`
+          if (!result.hasNewVersion) {
+            renderUpdateStatus(`已是最新版本 · ${label}`)
+            if (download) download.hidden = true
+            return
+          }
+          const url = result.downloadUrl || result.releaseUrl
+          renderUpdateStatus(`发现新版本 ${result.latestVersion} · ${label}`)
+          if (download) {
+            download.hidden = !url
+            download.disabled = false
+            download.dataset.url = url || ''
+            download.dataset.payload = JSON.stringify({
+              url: result.downloadUrl || '',
+              officialUrl: result.officialUrl || result.releaseUrl || '',
+              mirrorUrls: Array.isArray(result.mirrorUrls) ? result.mirrorUrls : []
+            })
+            setUpdateButtonText(download, result.supported ? '立即下载' : '打开发布页')
+          }
+        } finally {
+          if (!updateUiState.inProgress) check.disabled = false
+        }
+      }
+    }
+
+    if (download) {
+      download.onclick = async (event) => {
+        console.log('[update-debug] click event', {
+          ctrlKey: !!(event && event.ctrlKey),
+          shiftKey: !!(event && event.shiftKey),
+          targetId: event && event.target && event.target.id,
+          currentId: event && event.currentTarget && event.currentTarget.id,
+          disabled: download.disabled,
+          hidden: download.hidden,
+          text: download.textContent
+        })
+        if (event && isDebugTriggerEvent(event)) {
+          event.preventDefault(); event.stopPropagation()
+          const menu = download.parentElement.querySelector('.update-debug-menu')
+          console.log('[update-debug] menu toggle', { before: menu && menu.hidden, parentExists: !!download.parentElement })
+          if (menu) menu.hidden = !menu.hidden
+          return
+        }
+
+        const raw = download.dataset.payload || ''
+        const payload = raw ? JSON.parse(raw) : { officialUrl: download.dataset.url || '' }
+        if (!payload.officialUrl && !payload.url && !(payload.mirrorUrls && payload.mirrorUrls.length)) return
+
+        if (download.textContent === '立即更新') {
+          const installerPath = download.dataset.installerPath || ''
+          if (!installerPath) return
+          try {
+            const r = await window.sylph.installDownloadedUpdate(installerPath)
+            if (!r.ok) toast(r.message || '启动安装失败')
+          } catch (e) {
+            toast('启动安装失败')
+          }
+          return
+        }
+
+        try {
+          if (updateUiState.inProgress) return
+          lockUpdateAction(true)
+          download.disabled = true
+          setUpdateButtonText(download, '下载中 0%')
+          renderUpdateStatus('正在下载更新包…')
+          const r = await window.sylph.downloadUpdate(payload)
+          if (!r.ok) {
+            renderUpdateStatus(r.message || '下载失败')
+            lockUpdateAction(false)
+            download.disabled = false
+            setUpdateButtonText(download, '立即下载')
+            return
+          }
+          download.dataset.installerPath = r.installerPath || ''
+          renderUpdateStatus(`更新包已下载完成：${r.fileName || '安装包'}`)
+          updateBtnReady()
+        } catch (e) {
+          renderUpdateStatus('下载失败：' + (e && e.message ? e.message : e))
+          lockUpdateAction(false)
+          download.disabled = false
+          setUpdateButtonText(download, '立即下载')
+        } finally {
+          lockUpdateAction(false)
+        }
+      }
+    }
+  }
+
+  bindUpdateButtons()
+
+  if (!window.__sylphUpdateHooksBound) {
+    window.__sylphUpdateHooksBound = true
+    window.sylph.onUpdateDownloadProgress((progress) => {
+      if (!progress) return
+      lockUpdateAction(true)
+      updateBtnDownloading(progress)
+      const total = Number(progress.total) || 0
+      const downloaded = Number(progress.downloaded) || 0
+      const percent = Number(progress.percent) || 0
+      renderUpdateStatus(
+        total > 0
+          ? `下载中 ${percent}% · ${progress.fileName || '更新包'}`
+          : `下载中 ${fmtBytes(downloaded)} · ${progress.fileName || '更新包'}`
+      )
+    })
+    window.sylph.onUpdateReady((payload) => {
+      lockUpdateAction(false)
+      const { download } = getUpdateUiRefs()
+      if (download) {
+        download.dataset.installerPath = payload.installerPath || ''
+        updateBtnReady()
+      }
+      renderUpdateStatus(`更新包已准备好：${payload.fileName || '安装包'}`)
+    })
+  }
 }
 function closeSettings() { UI.settingsMask.classList.remove('open') }
 

@@ -445,7 +445,7 @@ body.is-fs.fs-bottom-show #controlbar {
 .modal-mask { position: fixed; inset: 0; z-index: 60; background: rgba(0,0,0,.5);
   display: none; align-items: center; justify-content: center; backdrop-filter: blur(3px); }
 .modal-mask.open { display: flex; }
-.modal { width: 460px; max-width: 92vw; max-height: 84vh; background: var(--bg-panel);
+.modal { width: min(760px, 92vw); max-width: 92vw; max-height: 84vh; background: var(--bg-panel);
   border: 1px solid var(--border); border-radius: 16px; box-shadow: var(--shadow);
   display: flex; flex-direction: column; overflow: hidden; animation: pop .2s ease; }
 @keyframes pop { from { transform: scale(.94); opacity: 0; } to { transform: scale(1); opacity: 1; } }
@@ -454,11 +454,15 @@ body.is-fs.fs-bottom-show #controlbar {
 .set-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 11px 0; border-bottom: 1px solid var(--border); }
 .set-row:last-child { border-bottom: none; }
 .set-label { font-size: 13.5px; }
-.set-desc { font-size: 11.5px; color: var(--text-faint); margin-top: 2px; }
+.set-desc { position: relative; font-size: 11.5px; color: var(--text-faint); margin-top: 2px; }
+.update-debug-menu { position: absolute; left: 0; top: calc(100% + 6px); z-index: 12; display: flex; flex-direction: column; gap: 6px; background: var(--bg-panel); border: 1px solid var(--border); border-radius: 10px; padding: 8px; box-shadow: var(--shadow); }
+.update-debug-menu[hidden] { display: none; }
+.update-debug-upload { white-space: nowrap; }
 /* 设置面板内的状态提示（如“无歌词故显示频谱”），仅当条件成立时渲染 */
 .set-note { display: flex; align-items: flex-start; gap: 7px; font-size: 12px; line-height: 1.5; color: var(--text); background: rgba(232, 179, 57, 0.12); border: 1px solid rgba(232, 179, 57, 0.3); border-radius: 8px; padding: 8px 10px; max-width: 330px; white-space: normal; }
 .set-note i { margin-top: 2px; color: #e8b339; }
 .set-control { display: flex; align-items: center; gap: 8px; }
+.update-actions { position: relative; }
 .set-select { background: var(--surface); color: var(--text); border: 1px solid var(--border); padding: 6px 10px; border-radius: 8px; font-size: 13px; outline: none; }
 /* 设置标签页 */
 .set-tabs { display: flex; gap: 6px; margin-bottom: 4px; border-bottom: 1px solid var(--border); }
