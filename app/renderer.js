@@ -2262,7 +2262,12 @@ function openSettings() {
     input.onchange = async () => {
       const file = input.files && input.files[0]
       if (!file) return
-      const installerPath = file.path || file.name
+      const installerPath = (file.path && String(file.path).trim()) || (file.name && String(file.name).trim()) || ''
+      if (!installerPath) {
+        toast('未读取到有效的本地安装包路径')
+        input.value = ''
+        return
+      }
       renderUpdateStatus(`已选本地安装包：${file.name}`)
       try {
         const r = await window.sylph.installDownloadedUpdate(installerPath)
@@ -2390,7 +2395,10 @@ function openSettings() {
 
         if (download.textContent === '立即更新') {
           const installerPath = download.dataset.installerPath || ''
-          if (!installerPath) return
+          if (!installerPath) {
+            toast('未找到已选择的安装包路径')
+            return
+          }
           try {
             const r = await window.sylph.installDownloadedUpdate(installerPath)
             if (!r.ok) toast(r.message || '启动安装失败')

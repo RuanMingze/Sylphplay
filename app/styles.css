@@ -245,7 +245,7 @@ button { font-family: inherit; cursor: pointer; }
 .cbtn i { pointer-events: none; line-height: 1; }
 .cbtn:hover { background: var(--surface-2); }
 /* 播放模式：单按钮 + 自定义下拉 */
-.mode-wrap { position: relative; flex: 0 0 auto; }
+.mode-wrap { position: relative; flex: 0 0 auto; overflow: visible; }
 #btn-mode i { color: var(--text-dim); }
 #btn-mode.state-on i { color: var(--accent); }
 .mode-menu {
@@ -295,7 +295,7 @@ button { font-family: inherit; cursor: pointer; }
 }
 .time { font-size: 12.5px; color: var(--text-dim); font-variant-numeric: tabular-nums; min-width: 42px; text-align: center; }
 
-.cb-right { display: flex; align-items: center; gap: 10px; flex: 0 0 auto; overflow: hidden; }
+.cb-right { display: flex; align-items: center; gap: 10px; flex: 0 0 auto; overflow: visible; }
 .vol-wrap { display: flex; align-items: center; gap: 8px; color: var(--text-dim); }
 .vol-ico { font-size: 15px; width: 16px; text-align: center; }
 #volume, #seek { -webkit-appearance: none; appearance: none; height: 5px; border-radius: 4px;

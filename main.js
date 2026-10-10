@@ -777,6 +777,22 @@ function ensureUpdaterDir() {
   fs.mkdirSync(dir, { recursive: true })
   return dir
 }
+function normalizeInstallerPath(installerPath) {
+  if (!installerPath || typeof installerPath !== 'string') return ''
+  let value = installerPath.trim()
+  if (!value) return ''
+  if (value.startsWith('file://')) {
+    try {
+      const u = new URL(value)
+      value = decodeURIComponent(u.pathname)
+      if (process.platform === 'win32' && value.startsWith('/')) value = value.slice(1)
+    } catch (e) {
+      value = value.replace(/^file:\/\//, '')
+    }
+  }
+  value = value.replace(/^\\\\/u, '')
+  return value
+}
 function updateFileNameFromUrl(rawUrl) {
   if (!rawUrl) return 'Sylphplay-Update.exe'
   try {
@@ -861,10 +877,11 @@ ipcMain.handle('app:download-update', async (_e, payload) => {
   return { ok: false, message: lastError && lastError.message ? lastError.message : '下载失败' }
 })
 ipcMain.handle('app:install-downloaded-update', async (_e, installerPath) => {
-  if (!installerPath || !fs.existsSync(installerPath)) {
+  const normalized = normalizeInstallerPath(installerPath)
+  if (!normalized || !fs.existsSync(normalized)) {
     return { ok: false, message: '未找到已下载安装包' }
   }
-  const child = spawn(process.execPath, [UPDATE_INSTALL_ARG, installerPath], {
+  const child = spawn(process.execPath, [UPDATE_INSTALL_ARG, normalized], {
     detached: true,
     stdio: 'ignore',
     windowsHide: true
