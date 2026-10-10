@@ -2429,6 +2429,10 @@ function openSettings() {
 
   bindUpdateButtons()
 
+  if (window.sylph && Array.isArray(window.sylph.launchArgs) && window.sylph.launchArgs.includes('--reset-update-state')) {
+    window.__sylphUpdateHooksBound = false
+    window.__sylphUpdateHooksBoundOnce = true
+  }
   if (!window.__sylphUpdateHooksBound) {
     window.__sylphUpdateHooksBound = true
     window.sylph.onUpdateDownloadProgress((progress) => {

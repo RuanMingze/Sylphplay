@@ -5,6 +5,7 @@ contextBridge.exposeInMainWorld('sylph', {
   // 当前平台标识：渲染层据此隐藏 Windows 专属入口（DLC / 设为默认打开方式）
   platform: process.platform,
   arch: process.arch,
+  launchArgs: process.argv.slice(2),
   openFiles: () => ipcRenderer.invoke('open-files'),
   openFolder: () => ipcRenderer.invoke('open-folder'),
   getFileMeta: (p) => ipcRenderer.invoke('get-file-meta', p),
