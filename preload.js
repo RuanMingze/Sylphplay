@@ -53,6 +53,13 @@ contextBridge.exposeInMainWorld('sylph', {
   // 自定义关闭弹窗（替代原生 dialog.showMessageBox）
   onAskClose: (cb) => ipcRenderer.on('ask-close', () => cb()),
   closeChoice: (payload) => ipcRenderer.send('close-choice', payload),
+  getVersion: () => ipcRenderer.invoke('app:get-version'),
+  checkForUpdates: () => ipcRenderer.invoke('app:check-update'),
+  openUpdateUrl: (url) => ipcRenderer.invoke('app:open-update-url', url),
+  downloadUpdate: (payload) => ipcRenderer.invoke('app:download-update', payload),
+  installDownloadedUpdate: (installerPath) => ipcRenderer.invoke('app:install-downloaded-update', installerPath),
+  onUpdateDownloadProgress: (cb) => ipcRenderer.on('app:update-download-progress', (_e, p) => cb(p)),
+  onUpdateReady: (cb) => ipcRenderer.on('app:update-ready', (_e, p) => cb(p)),
   // —— 强制对齐 DLC ——
   dlcStatus: () => ipcRenderer.invoke('dlc:status'),
   dlcDownload: () => ipcRenderer.invoke('dlc:download'),

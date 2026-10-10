@@ -1,8 +1,31 @@
 // Sylphplay 主进程 — Ruanftrix
 // 负责创建窗口、文件/文件夹对话框、媒体目录扫描、自定义标题栏窗口控制
-const { app, BrowserWindow, Menu, dialog, ipcMain, nativeImage, screen, powerSaveBlocker, Tray } = require('electron')
+const { app, BrowserWindow, Menu, dialog, ipcMain, nativeImage, screen, powerSaveBlocker, Tray, shell } = require('electron')
 const path = require('path')
 const fs = require('fs')
+const { spawn } = require('child_process')
+
+// GitHub / CDN 这类外部 HTTPS 站点在部分机器上会走系统根证书；
+// Electron 默认可能优先使用内置 CA bundle，导致校验失败。强制启用系统证书库后，
+// axios / fetch / https 请求会按系统信任链进行校验，避免“unable to verify the first certificate”。
+app.commandLine.appendSwitch('use-system-ca')
+
+const UPDATE_INSTALL_ARG = '--install-update'
+const UPDATE_INSTALL_PATH = process.argv.includes(UPDATE_INSTALL_ARG)
+    ? process.argv[process.argv.indexOf(UPDATE_INSTALL_ARG) + 1]
+    : null
+if (UPDATE_INSTALL_PATH && fs.existsSync(UPDATE_INSTALL_PATH)) {
+  try {
+    const installer = spawn(UPDATE_INSTALL_PATH, [], { detached: true, stdio: 'ignore' })
+    installer.unref()
+    isQuitting = true
+    app.exit(0)
+  } catch (e) {
+    console.error('[update-install] spawn failed:', e)
+    isQuitting = true
+    app.exit(1)
+  }
+}
 
 // 支持的媒体扩展名分类
 const MEDIA_EXT = {
@@ -574,6 +597,283 @@ ipcMain.handle('set-default-app', async () => {
   })
 })
 
+function normalizeVersion(raw) {
+  const text = String(raw || '').trim().replace(/^v/i, '')
+  const match = text.match(/\d+(?:\.\d+){0,2}/)
+  if (!match) return [0, 0, 0]
+  const parts = match[0].split('.').map(v => Number.parseInt(v, 10) || 0)
+  while (parts.length < 3) parts.push(0)
+  return parts.slice(0, 3)
+}
+function forceUpdateDebugEnabled() {
+  return process.argv.includes('--force-update-debug')
+}
+function compareVersions(a, b) {
+  const av = normalizeVersion(a)
+  const bv = normalizeVersion(b)
+  for (let i = 0; i < 3; i++) {
+    if (av[i] > bv[i]) return 1
+    if (av[i] < bv[i]) return -1
+  }
+  return 0
+}
+function platformLabel() {
+  const map = {
+    win32: 'Windows',
+    darwin: 'macOS',
+    linux: 'Linux'
+  }
+  const os = map[process.platform] || process.platform
+  const arch = process.arch === 'x64' ? 'x64' : process.arch === 'arm64' ? 'arm64' : process.arch
+  return `${os} ${arch}`
+}
+const UPDATE_MIRRORS = [
+  'https://gh.dpik.top/',
+  'https://github.starrlzy.cn/',
+  'https://github.tbap.top/',
+  'https://git.yylx.win/',
+  'https://ghfile.geekertao.top/',
+  'https://gh.llkk.cc/',
+  'https://ghfast.top/',
+  'https://ghproxy.ruanftrix.cn/'
+]
+function updateMirrorUrls(officialUrl) {
+  if (!officialUrl) return []
+  return UPDATE_MIRRORS.map(m => m + officialUrl)
+}
+async function probeUrlReachable(url, timeoutMs = 4000) {
+  if (!url) return false
+  const ctrl = new AbortController()
+  const timer = setTimeout(() => ctrl.abort(), timeoutMs)
+  try {
+    const res = await fetch(url, {
+      method: 'HEAD',
+      redirect: 'follow',
+      signal: ctrl.signal,
+      headers: { 'User-Agent': 'Sylphplay/UpdateProbe' }
+    })
+    return res.ok || res.status === 206 || res.status === 301 || res.status === 302 || res.status === 307 || res.status === 308
+  } catch (e) {
+    return false
+  } finally {
+    clearTimeout(timer)
+  }
+}
+function getAssetForCurrentPlatform(release) {
+  if (!release || !Array.isArray(release.assets)) return null
+  const platform = process.platform
+  const arch = process.arch
+  const haystack = release.assets
+    .map(item => ({ ...item, nameLower: String(item.name || '').toLowerCase() }))
+    .filter(item => item.nameLower)
+
+  const windowsPatterns = [
+    ['win32', 'x64', ['windows-x64', 'win-x64', 'windows-x86_64', 'win-x86_64', 'win64']],
+    ['win32', 'ia32', ['windows-ia32', 'win-ia32', 'windows-x86', 'win-x86', 'x86']],
+    ['win32', 'arm64', ['windows-arm64', 'win-arm64']],
+  ]
+  const darwinPatterns = [
+    ['darwin', 'x64', ['macos-x64', 'mac-x64', 'darwin-x64', 'osx-x64', 'macos-x86_64', 'darwin-x86_64']],
+    ['darwin', 'arm64', ['macos-arm64', 'mac-arm64', 'darwin-arm64', 'osx-arm64']],
+  ]
+  const linuxPatterns = [
+    ['linux', 'x64', ['linux-x64', 'linux-x86_64', 'x64', 'amd64']],
+    ['linux', 'arm64', ['linux-arm64', 'aarch64', 'arm64']],
+  ]
+  const allPatterns = [...windowsPatterns, ...darwinPatterns, ...linuxPatterns]
+  const targetPatterns = allPatterns.find(([p, a]) => p === platform && a === arch)
+  const patterns = targetPatterns ? targetPatterns[2] : []
+  const matched = haystack.find(item => patterns.some(p => item.nameLower.includes(p)))
+  if (matched) return matched
+
+  // 兜底：同平台 + 可执行文件类型优先
+  const fallbackPatterns = {
+    win32: ['.exe', 'setup', 'windows', 'win'],
+    darwin: ['.dmg', 'macos', 'darwin', 'osx'],
+    linux: ['linux', 'appimage', 'deb', 'rpm']
+  }
+  const fallback = fallbackPatterns[platform] || []
+  return haystack.find(item => fallback.some(p => item.nameLower.includes(p))) || haystack[0] || null
+}
+ipcMain.handle('app:get-version', () => app.getVersion() || '0.0.0')
+ipcMain.handle('app:check-update', async () => {
+  const currentVersion = app.getVersion() || '0.0.0'
+  try {
+    const res = await axios.get('https://api.github.com/repos/RuanMingze/Sylphplay/releases/latest', {
+      headers: {
+        'User-Agent': `Sylphplay/${currentVersion}`,
+        Accept: 'application/vnd.github+json'
+      },
+      timeout: 30000
+    })
+    const release = res && res.data ? res.data : {}
+    const tagName = String(release.tag_name || '').trim()
+    const latestVersion = tagName.replace(/^v/i, '')
+    const asset = getAssetForCurrentPlatform(release)
+    const officialUrl = asset ? (asset.browser_download_url || release.html_url) : (release.html_url || '')
+    const mirrorUrls = updateMirrorUrls(officialUrl)
+    const hasNewVersion = forceUpdateDebugEnabled() || compareVersions(latestVersion, currentVersion) > 0
+    return {
+      ok: true,
+      currentVersion,
+      latestVersion,
+      tagName,
+      hasNewVersion,
+      supported: !!asset,
+      platform: process.platform,
+      arch: process.arch,
+      platformLabel: platformLabel(),
+      releaseUrl: release.html_url || '',
+      officialUrl,
+      mirrorUrls,
+      downloadUrl: mirrorUrls[0] || officialUrl,
+      assetName: asset ? asset.name : null,
+      body: release.body || '',
+      debugForce: forceUpdateDebugEnabled(),
+      message: hasNewVersion
+        ? `发现新版本 ${latestVersion}（当前 ${currentVersion}）`
+        : `当前已是最新版本 ${currentVersion}`
+    }
+  } catch (error) {
+    return {
+      ok: false,
+      currentVersion,
+      error: error && error.message ? error.message : String(error)
+    }
+  }
+})
+ipcMain.handle('app:open-update-url', async (_e, payload) => {
+  let urls = []
+  if (typeof payload === 'string') urls = [payload]
+  else if (payload && typeof payload === 'object') {
+    if (payload.url) urls.push(payload.url)
+    if (payload.officialUrl) urls.push(payload.officialUrl)
+    if (Array.isArray(payload.mirrorUrls)) urls.push(...payload.mirrorUrls)
+  }
+  urls = [...new Set(urls.filter(Boolean))]
+  if (!urls.length) return { ok: false, message: '缺少下载地址' }
+
+  for (const url of urls) {
+    const ok = await probeUrlReachable(url)
+    if (ok) {
+      try {
+        await shell.openExternal(url)
+        return { ok: true, url }
+      } catch (error) {
+        return { ok: false, message: error && error.message ? error.message : String(error) }
+      }
+    }
+  }
+
+  try {
+    await shell.openExternal(urls[urls.length - 1])
+    return { ok: true, url: urls[urls.length - 1] }
+  } catch (error) {
+    return { ok: false, message: error && error.message ? error.message : String(error) }
+  }
+})
+function ensureUpdaterDir() {
+  const dir = path.join(app.getPath('userData'), 'updates')
+  fs.mkdirSync(dir, { recursive: true })
+  return dir
+}
+function updateFileNameFromUrl(rawUrl) {
+  if (!rawUrl) return 'Sylphplay-Update.exe'
+  try {
+    const u = new URL(rawUrl)
+    const base = path.basename(u.pathname)
+    if (base && base !== '/') return base
+  } catch (e) {}
+  return 'Sylphplay-Update.exe'
+}
+function getUpdateDownloadCandidates(payload) {
+  let urls = []
+  if (typeof payload === 'string') urls = [payload]
+  else if (payload && typeof payload === 'object') {
+    if (payload.url) urls.push(payload.url)
+    if (payload.officialUrl) urls.push(payload.officialUrl)
+    if (Array.isArray(payload.mirrorUrls)) urls.push(...payload.mirrorUrls)
+  }
+  return [...new Set(urls.filter(Boolean))]
+}
+async function streamDownloadFile(url, targetPath, onProgress) {
+  const response = await axios.get(url, {
+    responseType: 'stream',
+    timeout: 60000,
+    maxRedirects: 10,
+    headers: {
+      'User-Agent': 'Sylphplay/Update',
+      Accept: '*/*'
+    },
+    validateStatus: status => status >= 200 && status < 300
+  })
+
+  const total = Number(response.headers['content-length'] || 0)
+  let downloaded = 0
+  await new Promise((resolve, reject) => {
+    const writer = fs.createWriteStream(targetPath)
+    response.data.on('data', chunk => {
+      downloaded += chunk.length
+      if (typeof onProgress === 'function') {
+        const percent = total > 0 ? Math.round(downloaded * 100 / total) : undefined
+        onProgress({ total, downloaded, percent })
+      }
+    })
+    response.data.on('end', () => resolve())
+    response.data.on('error', reject)
+    writer.on('error', reject)
+    writer.on('finish', () => resolve())
+    response.data.pipe(writer)
+  })
+}
+ipcMain.handle('app:download-update', async (_e, payload) => {
+  const urls = getUpdateDownloadCandidates(payload)
+  if (!urls.length) return { ok: false, message: '缺少下载地址' }
+
+  const dir = ensureUpdaterDir()
+  let lastError = null
+  for (const url of urls) {
+    const fileName = updateFileNameFromUrl(url)
+    const targetPath = path.join(dir, fileName)
+    try {
+      await streamDownloadFile(url, targetPath, ({ total, downloaded, percent }) => {
+        if (win && !win.isDestroyed()) {
+          win.webContents.send('app:update-download-progress', {
+            url,
+            total,
+            downloaded,
+            percent,
+            fileName,
+            stage: 'download'
+          })
+        }
+      })
+      if (win && !win.isDestroyed()) {
+        win.webContents.send('app:update-ready', { installerPath: targetPath, fileName })
+      }
+      return { ok: true, installerPath: targetPath, fileName, url }
+    } catch (error) {
+      lastError = error
+      try { fs.rmSync(targetPath, { force: true }) } catch (e) {}
+      if (url === urls[urls.length - 1]) break
+    }
+  }
+  return { ok: false, message: lastError && lastError.message ? lastError.message : '下载失败' }
+})
+ipcMain.handle('app:install-downloaded-update', async (_e, installerPath) => {
+  if (!installerPath || !fs.existsSync(installerPath)) {
+    return { ok: false, message: '未找到已下载安装包' }
+  }
+  const child = spawn(process.execPath, [UPDATE_INSTALL_ARG, installerPath], {
+    detached: true,
+    stdio: 'ignore',
+    windowsHide: true
+  })
+  child.unref()
+  setTimeout(() => { isQuitting = true; app.exit(0) }, 120)
+  return { ok: true, installerPath }
+})
+
 app.whenReady().then(() => {
   trayOnClose = loadTrayOnClose()
   // Windows 任务栏图标正确归组（需与打包后 productName 一致）；仅 Windows 有效
@@ -870,7 +1170,6 @@ ipcMain.handle('dlc:remove', () => {
  */
 const os = require('os')
 const crypto = require('crypto')
-const { spawn } = require('child_process')
 
 const ALIGN_AUDIO_EXT = ['.mp3', '.flac', '.wav', '.m4a', '.aac', '.ogg', '.opus', '.wma', '.mp4']
 const ALIGN_LANG_CODE = { '中文 (zh)': 'zh', '英语 (en)': 'en', '日语 (ja)': 'ja', '韩语 (ko)': 'ko' }

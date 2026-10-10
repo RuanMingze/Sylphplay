@@ -2171,13 +2171,27 @@ function openSettings() {
       if (updateStatusText) updateStatusText.textContent = `当前系统：${systemName} ${archName}`.trim()
     })
   }
-  const updateUiState = { inProgress: false, installerPath: '', updatePayload: null }
+  const updateUiState = { inProgress: false, installerPath: '', updatePayload: null, checkToken: 0, checkTimer: null }
 
   const getUpdateUiRefs = () => ({
     check: document.getElementById('check-update-btn'),
     download: document.getElementById('update-download-btn'),
     status: document.getElementById('update-status-text')
   })
+
+  const resetCheckUiState = (statusText = '') => {
+    updateUiState.inProgress = false
+    if (updateUiState.checkTimer) {
+      clearTimeout(updateUiState.checkTimer)
+      updateUiState.checkTimer = null
+    }
+    const { check, download } = getUpdateUiRefs()
+    if (check) check.disabled = false
+    if (download && download.textContent !== '立即更新') {
+      download.disabled = false
+    }
+    if (statusText) renderUpdateStatus(statusText)
+  }
 
   const lockUpdateAction = (inProgress) => {
     updateUiState.inProgress = !!inProgress
@@ -2298,10 +2312,21 @@ function openSettings() {
     if (check) {
       check.onclick = async () => {
         if (updateUiState.inProgress) return
+        const token = ++updateUiState.checkToken
+        updateUiState.inProgress = true
         check.disabled = true
         renderUpdateStatus('正在检查更新…')
+        if (updateUiState.checkTimer) clearTimeout(updateUiState.checkTimer)
+        updateUiState.checkTimer = setTimeout(() => {
+          if (token !== updateUiState.checkToken) return
+          updateUiState.inProgress = false
+          if (check) check.disabled = false
+          renderUpdateStatus('检查更新超时，请稍后重试')
+          if (download) download.disabled = false
+        }, 20000)
         try {
           const result = await window.sylph.checkForUpdates()
+          if (token !== updateUiState.checkToken) return
           if (!result.ok) {
             renderUpdateStatus('检查更新失败：' + (result.error || '未知错误'))
             return
@@ -2326,7 +2351,14 @@ function openSettings() {
             setUpdateButtonText(download, result.supported ? '立即下载' : '打开发布页')
           }
         } finally {
-          if (!updateUiState.inProgress) check.disabled = false
+          if (token === updateUiState.checkToken) {
+            updateUiState.inProgress = false
+            if (updateUiState.checkTimer) {
+              clearTimeout(updateUiState.checkTimer)
+              updateUiState.checkTimer = null
+            }
+            if (check) check.disabled = false
+          }
         }
       }
     }
