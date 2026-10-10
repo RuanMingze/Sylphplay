@@ -1694,8 +1694,9 @@ const Ctrl = {
     $('#btn-fs').onclick = toggleFullscreen
     $('#btn-info').onclick = openInfo
     $('#btn-lrc').onclick = importLyrics
-    // 播放模式下拉：由 MODES 生成（含图标），并绑定选中/关闭
-    if (UI.modeMenu) {
+    // 播放模式下拉：只初始化一次（避免 openSettings 重绑导致 DOM 叠加 / handler 竞态）
+    if (UI.modeMenu && !UI.modeMenu.dataset.ready) {
+      UI.modeMenu.textContent = ''
       for (const k of Object.keys(MODES)) {
         const li = document.createElement('div')
         li.className = 'mode-item'
@@ -1704,8 +1705,9 @@ const Ctrl = {
         UI.modeMenu.appendChild(li)
       }
       UI.modeMenu.addEventListener('click', (e) => { e.stopPropagation(); const it = e.target.closest('.mode-item'); if (it) setPlayMode(it.dataset.mode) })
+      window.addEventListener('click', () => closeModeMenu())
+      UI.modeMenu.dataset.ready = '1'
     }
-    window.addEventListener('click', () => closeModeMenu())
 
     // 信息面板关闭
     $('#info-close').onclick = closeInfo
