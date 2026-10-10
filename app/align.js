@@ -128,7 +128,8 @@ async function alignRun() {
     parallel: $('#opt-parallel').checked,
     debug: $('#opt-debug').checked,
     language: $('#opt-lang').value,
-    format: $('#opt-format').value
+    format: $('#opt-format').value,
+    strength: parseFloat($('#opt-strength').value) || 0.9
   })
   if (!r.ok) {
     $('#run').disabled = false; $('#cancel').disabled = true
@@ -148,6 +149,11 @@ $('#cancel').addEventListener('click', async () => {
 // 调试日志区显隐
 $('#opt-debug').addEventListener('change', () => {
   $('#log-card').classList.toggle('show', $('#opt-debug').checked)
+})
+
+// 匹配强度滑块实时回显
+$('#opt-strength').addEventListener('input', () => {
+  $('#strength-val').textContent = parseFloat($('#opt-strength').value).toFixed(2)
 })
 
 $('#save').addEventListener('click', async () => {

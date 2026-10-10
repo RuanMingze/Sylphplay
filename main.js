@@ -1386,6 +1386,8 @@ async function alignRunOne(it, engine, opts) {
   const args = [...engine.args, '--audio', it.audio, '--lrc', it.lrc, '--out', outJson, '--work', workDir]
   const lang = alignLangCode(opts.language)
   if (lang) args.push('--language', lang)
+  const strength = typeof opts.strength === 'number' ? opts.strength : 0.9
+  args.push('--match-strength', strength.toString())
 
   let stdout = '', lastPush = 0
   const env = Object.assign({}, process.env, {
@@ -1537,7 +1539,8 @@ ipcMain.handle('align:run', async (_e, opts) => {
         alignSend('align:progress', { done, total, status: `正在处理 ${done + 1}/${total}：${path.basename(it.audio)}` })
         await alignRunOne(it, engine, {
           language: opts.language,
-          enhanced: opts.format !== '简单(逐行)'
+          enhanced: opts.format !== '简单(逐行)',
+          strength: opts.strength
         })
         done++
         alignSend('align:progress', { done, total, status: `已完成 ${done}/${total}` })
