@@ -57,5 +57,6 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: sylphplay-windows-${{ matrix.arch }}
-          path: dist/*.exe
+          path: dist/*-Windows-${{ matrix.arch }}-Setup.exe
           if-no-files-found: error
+

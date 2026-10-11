@@ -36,15 +36,7 @@
     "win": {
       "icon": "assets/icon.ico",
       "artifactName": "${productName}-${version}-Windows-${arch}-Setup.${ext}",
-      "target": [
-        {
-          "target": "nsis",
-          "arch": [
-            "x64",
-            "ia32"
-          ]
-        }
-      ],
+      "target": ["nsis"],
       "extraResources": [
         {
           "from": "assoc-helper/out",
@@ -66,15 +58,7 @@
       "icon": "assets/icon.png",
       "category": "public.app-category.video",
       "artifactName": "${productName}-${version}-macOS-${arch}-Setup.${ext}",
-      "target": [
-        {
-          "target": "dmg",
-          "arch": [
-            "x64",
-            "arm64"
-          ]
-        }
-      ]
+      "target": ["dmg"]
     },
     "linux": {
       "icon": "assets/icon.png",
