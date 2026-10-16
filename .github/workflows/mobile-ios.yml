@@ -27,6 +27,39 @@ jobs:
       - name: Install dependencies
         run: flutter pub get
 
+      # 生成并导入自签名证书（macOS runner 自带 openssl + security），
+      # 让 Xcode 真签而不是 sed 注入 stub 字符串。证书进系统默认 keychain，
+      # 下次构建 keychain 还在 → 不再需要重新生成。
+      - name: Generate self-signed signing cert
+        shell: bash
+        run: |
+          set -e
+          CERT_PEM=/tmp/selph_adhoc.cert.pem
+          KEY_PEM=/tmp/selph_adhoc.key.pem
+          P12=/tmp/selph_adhoc.p12
+          PASS='SylphplayCI'
+          # 若 keychain 里已有同名证书（上轮 workflow 残留）则先删
+          security find-certificate -a -c "Sylphplay CI AdHoc" -Z 2>/dev/null \
+            | awk -F'"' '/SHA-1 hash/{print $2}' \
+            | xargs -I{} security delete-certificate -Z {} 2>/dev/null || true
+          # 生成自签名证书（1 年有效）
+          openssl req -x509 -nodes -sha256 -newkey rsa:2048 \
+            -days 365 \
+            -keyout "$KEY_PEM" -out "$CERT_PEM" \
+            -subj "/CN=Sylphplay CI AdHoc/OU=CI/CN=cn.ruanftrix.sylphplayMobile"
+          # 转成 p12 格式（security 导入必须 p12）
+          openssl pkcs12 -export -legacy \
+            -in "$CERT_PEM" -inkey "$KEY_PEM" \
+            -out "$P12" -passout pass:"$PASS"
+          # 导入到登录 keychain，信任根
+          security import "$P12" -P "$PASS" -A \
+            -k "$HOME/Library/Keychains/login.keychain-db"
+          security set-key-partition-list -S apple-tool:,apple:,codesign: \
+            -k "" "$HOME/Library/Keychains/login.keychain-db" 2>/dev/null || true
+          security add-trusted-cert -d -r trustRoot -k \
+            "$HOME/Library/Keychains/login.keychain-db" "$CERT_PEM" || true
+          echo "cert imported"
+
       - name: Stub signing team
         run: python3 stub_team.py ios/Runner.xcodeproj/project.pbxproj
 
