@@ -48,7 +48,8 @@ jobs:
             -keyout "$KEY_PEM" -out "$CERT_PEM" \
             -subj "/CN=Sylphplay CI AdHoc/OU=CI/CN=cn.ruanftrix.sylphplayMobile"
           # 转成 p12 格式（security 导入必须 p12）
-          openssl pkcs12 -export -legacy \
+          # openssl 3.x 下 pkcs12 -export 可能要二次确认 passphrase，喂两次防交互
+          printf '%s\n%s\n' "$PASS" "$PASS" | openssl pkcs12 -export -legacy \
             -in "$CERT_PEM" -inkey "$KEY_PEM" \
             -out "$P12" -passout pass:"$PASS"
           # 导入到登录 keychain，信任根
