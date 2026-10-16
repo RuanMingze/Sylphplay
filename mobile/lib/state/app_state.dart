@@ -483,7 +483,7 @@ class AppState extends ChangeNotifier {
     if (settings.lyricsEnabled && lyricLines.isNotEmpty && lyricCurPath == it.path) {
       try {
         extras['metadata'] = jsonEncode([
-          for (final l in lyricLines) {'t': l.start, 'c': l.text}
+          for (final l in lyricLines) {'t': l.t, 'c': l.text}
         ]);
       } catch (_) {}
     }
