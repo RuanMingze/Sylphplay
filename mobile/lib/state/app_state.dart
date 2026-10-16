@@ -208,7 +208,26 @@ class AppState extends ChangeNotifier {
     fn(settings);
     await saveSettings();
     if (apply) _applySpeed();
+    // mini 模式开关联动：关闭耗性能功能 + 重建 ticker + 清空图片缓存
+    _applyMiniMode();
     notifyListeners();
+  }
+
+  /// mini 模式联动：
+  /// - 关：visualizer 频谱、歌词逐字填充动画（ticker 仍 800ms 频率就够）
+  /// - 开：重建 ticker 频率、清空 imageCache（车机后台 CPU/GPU 宝贵）
+  void _applyMiniMode() {
+    if (settings.miniMode) {
+      if (settings.vizEnabled) {
+        settings.vizEnabled = false;
+        saveSettings(); // 用户不知道时自动关，持久化防止每次重开又出现
+      }
+      _startTicker(); // 重建为 800ms
+      imageCache.clear();
+      imageCache.clearLiveImages();
+    } else {
+      _startTicker(); // 重建回 250ms
+    }
   }
 
   /// 当前主题是否为深色（theme=system 时跟随系统）
@@ -455,8 +474,25 @@ class AppState extends ChangeNotifier {
   }
 
   /// 为音频项构造带 MediaItem 标签的音源（通知栏/锁屏标题、封面依赖它）
+  ///
+  /// iOS 13+ 的「正在播放」面板支持通过 extras 传歌词时间轴，
+  /// 当 lyricsEnabled==true 且当前已装歌词时，把 LRC 解析后的 `[{t:秒, c:文本}]`
+  /// 序列附进去，系统音乐 app 会自动在锁屏/控制中心显示逐行歌词。
   AudioSource _audioSourceFor(MediaItem it) {
-    final tag = jab.MediaItem(id: it.path, title: it.name, album: 'Sylphplay');
+    final extras = <String, dynamic>{};
+    if (settings.lyricsEnabled && lyricLines.isNotEmpty && lyricCurPath == it.path) {
+      try {
+        extras['metadata'] = jsonEncode([
+          for (final l in lyricLines) {'t': l.start, 'c': l.text}
+        ]);
+      } catch (_) {}
+    }
+    final tag = jab.MediaItem(
+      id: it.path,
+      title: it.name,
+      album: 'Sylphplay',
+      extras: extras.isEmpty ? null : extras,
+    );
     return it.url
         ? AudioSource.uri(Uri.parse(it.path), tag: tag)
         : AudioSource.file(it.path, tag: tag);
@@ -794,7 +830,9 @@ class AppState extends ChangeNotifier {
      ============================================================ */
   void _startTicker() {
     _ticker?.cancel();
-    _ticker = Timer.periodic(const Duration(milliseconds: 250), (_) {
+    // mini 模式把 ticker 频率从 250ms 降到 800ms，减少车机后台 CPU 占用
+    final interval = settings.miniMode ? 800 : 250;
+    _ticker = Timer.periodic(Duration(milliseconds: interval), (_) {
       _tick();
     });
   }
@@ -817,12 +855,19 @@ class AppState extends ChangeNotifier {
           });
         }
       }
-      if (dur > 0 && pos >= dur - 0.25 && !_endedFired) {
-        if (wasPlaying && !m.playing) {
-          _onEnded();
-        } else if (wasPlaying) {
-          _onEnded();
-        }
+      // 自动续播 / 循环：
+      // - 音频项：全部交给 just_audio 的 LoopMode + 自动续播机制，
+      //   播放器内部按队列顺序前进，我们只通过 _bindPlayerIndex 同步 UI。
+      //   严禁在这里用 position >= duration 近似值触发 next() —— 车机后台
+      //   调度、系统 resume、损坏容错回播等都会让 position 瞬时越过终点，
+      //   造成「播放到一半突然跳曲」。
+      // - 视频项（VideoPlayer）没有 LoopMode 概念，仍走本文件的本地 ended 判断。
+      if (m is! AudioHandle &&
+          dur > 0 &&
+          pos >= dur - 0.5 &&
+          !_endedFired &&
+          wasPlaying) {
+        _onEnded();
       }
     }
     // 歌词高亮（逐字填充进度由歌词视图自己的帧回调计算）

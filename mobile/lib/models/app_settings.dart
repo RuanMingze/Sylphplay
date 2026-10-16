@@ -90,6 +90,7 @@ class AppSettings {
   bool expLyricsFill;
   bool expAutoLyrics;
   bool natQuiet; // 国庆彩蛋：临时切回默认深浅主题
+  bool miniMode; // 极简模式：关闭耗性能功能，适合车机/后台长时播放
 
   AppSettings({
     this.theme = 'system',
@@ -118,6 +119,7 @@ class AppSettings {
     this.expLyricsFill = false,
     this.expAutoLyrics = false,
     this.natQuiet = false,
+    this.miniMode = false,
   });
 
   Map<String, dynamic> toJson() => {
@@ -147,6 +149,7 @@ class AppSettings {
         'expLyricsFill': expLyricsFill,
         'expAutoLyrics': expAutoLyrics,
         'natQuiet': natQuiet,
+        'miniMode': miniMode,
       };
 
   /// 解析（含旧 loopMode/shuffle → playMode 迁移，与桌面版 loadSettings 一致）
@@ -190,6 +193,7 @@ class AppSettings {
     s.expLyricsFill = _bool(raw['expLyricsFill'], s.expLyricsFill);
     s.expAutoLyrics = _bool(raw['expAutoLyrics'], s.expAutoLyrics);
     s.natQuiet = _bool(raw['natQuiet'], s.natQuiet);
+    s.miniMode = _bool(raw['miniMode'], s.miniMode);
     return s;
   }
 

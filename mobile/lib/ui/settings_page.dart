@@ -244,6 +244,12 @@ class _SettingsPageState extends State<SettingsPage> {
             (v) => st.updateSettings((x) => x.vizEnabled = v)),
       ),
       _tile(
+        '极简模式',
+        '关闭耗性能功能（频谱、ticker 频率降 70%、清图片缓存）。适合车机等后台长时播放场景，切换后自动重启 ticker 并清空缓存',
+        _switch(c, s.miniMode,
+            (v) => st.updateSettings((x) => x.miniMode = v)),
+      ),
+      _tile(
         '歌词显示行数',
         '歌词页一屏显示多少行',
         _slider(
