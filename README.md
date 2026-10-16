@@ -254,9 +254,15 @@ mobile/
 
 - [CONTRIBUTING.md](CONTRIBUTING.md) —— 贡献规范与产品方向约束
 
-## 💖 支持 Sylphplay
+## 支持 Sylphplay
 如果你觉得这个播放器好用，可以通过爱发电支持开发：
-- [爱发电主页](https://ifdian.net/a/ruanmingze)
+
+1. 直接访问：[`https://afdian.com/a/ruanmingze`](https://afdian.com/a/ruanmingze)
+2. 扫描下方二维码：
+   ![爱发电 · RuanMingze](.github/assets/afdian-RuanMingze.jpg)
+3. 打开 [`https://afdian.com/`](https://afdian.com/) ，点击顶部搜索按钮，搜索 **RuanMingze**
+
+> 防混淆提示：GitHub 上有一个叫 **Sylphplayer** 的高仿网易云播放器，与本项目无关。捐赠前请认准作者 RuanMingze，感谢！
 
 ### 对「加曲库」类 PR 的说明
 
