@@ -35,8 +35,10 @@ jobs:
           set -e
           KEYCHAIN="$HOME/Library/Keychains/login.keychain-db"
           PASS='SylphplayCI'
-          CERT_PEM=".github/certs/sylphplay-ci.cert.pem"
-          P12=".github/certs/sylphplay-ci.p12"
+          # 用绝对路径避免 runner bash 工作目录解析漂移
+          CERT_PEM="$GITHUB_WORKSPACE/.github/certs/sylphplay-ci.cert.pem"
+          P12="$GITHUB_WORKSPACE/.github/certs/sylphplay-ci.p12"
+          test -f "$P12" || { echo "ERROR: p12 not found at $P12"; ls -la "$GITHUB_WORKSPACE/.github/certs/"; exit 1; }
           # 若 keychain 里已有同名证书（上轮 workflow 残留）则先删
           security find-certificate -a -c "Sylphplay CI AdHoc" -Z 2>/dev/null \
             | awk -F'"' '/SHA-1 hash/{print $2}' \
