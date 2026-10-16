@@ -542,7 +542,13 @@ function lineFraction(line, nxt, time) {
   const lt = line.t
   const chars = String(line.text || '').length
     || ((line.words || []).reduce((s, w) => s + String(w.text).length, 0) || 1)
-  let dur = Math.max(0.4, Math.min(chars * LYRIC_PER_CHAR, ((currentMedia && currentMedia.duration) || 30) - lt))
+  const durRaw = Math.max(0.4, Math.min(chars * LYRIC_PER_CHAR, ((currentMedia && currentMedia.duration) || 30) - lt))
+  // 有下一句时：dur 跟随真实间隔，有上下限避免跳尾部 / 尾部停
+  //  - 真实间隔 < durRaw：dur 降到真实间隔 → segEnd=nxt.t 时分数正好 1.0，无跳变
+  //  - 真实间隔 > durRaw：dur 封顶 durRaw×1.5 → 尾部停窗口从 (间隔-durRaw) 缩到 (间隔-durRaw*1.5)
+  const dur = nxt
+    ? Math.min(durRaw * 1.5, Math.max(0.4, Math.abs(nxt.t - lt)))
+    : durRaw
   if (line.words && line.words.length) {
     const ws = line.words
     const total = ws.reduce((s, w) => s + String(w.text).length, 0) || 1
@@ -561,7 +567,7 @@ function lineFraction(line, nxt, time) {
     }
     return Math.min(1, Math.max(0, done / total))
   }
-  // 已唱到下一句 → 整行强制填满；否则按字数估算的节奏线性揭示
+  // 已唱到下一句 → 整行强制填满；否则按（向真实间隔靠拢后的）dur 线性揭示
   let p = nxt && time >= nxt.t ? 1 : (time - lt) / dur
   return Math.min(1, Math.max(0, p))
 }
@@ -588,7 +594,11 @@ function lineBreakpoints(line, nxt) {
   }
   // 普通行：与 lineFraction 的「按字数估算 + 到下一句强制填满」一致
   const chars = String(line.text || '').length || 1
-  const dur = Math.max(0.4, Math.min(chars * LYRIC_PER_CHAR, ((currentMedia && currentMedia.duration) || 30) - line.t))
+  const durRaw = Math.max(0.4, Math.min(chars * LYRIC_PER_CHAR, ((currentMedia && currentMedia.duration) || 30) - line.t))
+  // 与 lineFraction 同源：dur 跟随真实间隔，上下限避免跳尾部 / 尾部停
+  const dur = nxt
+    ? Math.min(durRaw * 1.5, Math.max(0.4, Math.abs(nxt.t - line.t)))
+    : durRaw
   const segEnd = nxt ? Math.min(line.t + dur, nxt.t) : (line.t + dur)
   const pts = [[line.t, 0], [segEnd, clamp01((segEnd - line.t) / dur)]]
   if (nxt) pts.push([Math.max(segEnd, nxt.t), 1])

@@ -107,7 +107,13 @@ double lineFraction(LyricLine line, LyricLine? nxt, double time, double mediaDur
           ? words.fold<int>(0, (s, w) => s + w.text.length)
           : 1);
   final durLimit = (mediaDuration > 0 ? mediaDuration : 30) - lt;
-  final dur = _maxD(0.4, _minD(chars * lyricPerChar, durLimit));
+  final durRaw = _maxD(0.4, _minD(chars * lyricPerChar, durLimit));
+  // 有下一句时：dur 跟随真实间隔，有上下限避免跳尾部 / 尾部停
+  //  - 真实间隔 < durRaw：dur 降到真实间隔 → segEnd=nxt.t 时分数正好 1.0，无跳变
+  //  - 真实间隔 > durRaw：dur 封顶 durRaw×1.5 → 尾部停窗口从 (间隔-durRaw) 缩到 (间隔-durRaw*1.5)
+  final dur = (nxt != null)
+      ? _minD(durRaw * 1.5, _maxD(0.4, (nxt!.t - lt).abs()))
+      : durRaw;
   if (words != null && words.isNotEmpty) {
     final ws = words;
     final total = ws.fold<int>(0, (s, w) => s + w.text.length);
@@ -150,7 +156,11 @@ List<List<double>> lineBreakpoints(LyricLine line, LyricLine? nxt, double mediaD
   }
   final chars = line.text.isNotEmpty ? line.text.length : 1;
   final durLimit = (mediaDuration > 0 ? mediaDuration : 30) - line.t;
-  final dur = _maxD(0.4, _minD(chars * lyricPerChar, durLimit));
+  final durRaw = _maxD(0.4, _minD(chars * lyricPerChar, durLimit));
+  // 与 lineFraction 同源：dur 跟随真实间隔，上下限避免跳尾部 / 尾部停
+  final dur = (nxt != null)
+      ? _minD(durRaw * 1.5, _maxD(0.4, (nxt!.t - line.t).abs()))
+      : durRaw;
   final segEnd = nxt != null ? _minD(line.t + dur, nxt.t) : (line.t + dur);
   pts.add([line.t, 0]);
   pts.add([segEnd, _clamp01((segEnd - line.t) / dur)]);
