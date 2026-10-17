@@ -22,7 +22,7 @@ private let kMPLyrics = "__MPNowPlayingInfoPropertyLyrics"
     // 关键：注册所有 Flutter 原生插件（just_audio / video_player / audio_session 等）
     // 上轮重构时丢了这行 → 插件没注册 → JustAudioBackground.init() 永远等不到原生响应 → 白屏
     if let controller = window?.rootViewController as? FlutterViewController {
-      GeneratedPluginRegistrant.register(with: controller.pluginRegistry)
+      GeneratedPluginRegistrant.register(with: controller.pluginRegistry())
       setupChannels(messenger: controller.binaryMessenger)
     }
     return ok
