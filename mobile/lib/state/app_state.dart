@@ -1042,7 +1042,7 @@ class AppState extends ChangeNotifier {
     lyricActiveIdx = lead;
     if (changed) {
       // 歌词行切换时同步到 iOS 锁屏/控制中心 Now Playing（原生桥接）
-      unawaited(setLockscreenLyrics(lyricLines[idx].c));
+      unawaited(setLockscreenLyrics(lyricLines[idx].text));
       notifyListeners();
     }
   }
