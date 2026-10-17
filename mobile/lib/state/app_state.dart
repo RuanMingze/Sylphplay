@@ -11,6 +11,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import '../logic/auto_lyrics.dart';
 import '../logic/lrc.dart';
+import '../logic/lockscreen_lyrics.dart';
 import '../logic/media_probe.dart';
 import '../models/app_settings.dart';
 import '../models/media_item.dart';
@@ -930,6 +931,8 @@ class AppState extends ChangeNotifier {
     lyricLines.clear();
     lyricActiveIdx = -1;
     lyricCurPath = null;
+    // 换歌 / 切媒体 / 关闭歌词时同步清 iOS 锁屏 Now Playing 的歌词
+    unawaited(clearLockscreenLyrics());
     notifyListeners();
   }
 
@@ -1026,7 +1029,11 @@ class AppState extends ChangeNotifier {
     final lead = lyricLines[idx].group;
     final changed = lead != lyricActiveIdx;
     lyricActiveIdx = lead;
-    if (changed) notifyListeners();
+    if (changed) {
+      // 歌词行切换时同步到 iOS 锁屏/控制中心 Now Playing（原生桥接）
+      unawaited(setLockscreenLyrics(lyricLines[idx].c));
+      notifyListeners();
+    }
   }
 
   /* ============================================================

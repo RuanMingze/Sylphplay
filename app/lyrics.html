@@ -36,11 +36,19 @@
     #lyric.fill .lf { color: #ff7a00; }
     #bar {
       position: absolute; top: 4px; right: 8px; z-index: 2;
-      display: none; align-items: center; gap: 5px;
       background: rgba(0, 0, 0, 0.6); border: 1px solid rgba(255, 255, 255, 0.15);
       border-radius: 9px; padding: 3px 7px; -webkit-app-region: no-drag;
+      display: flex; opacity: 0; transition: opacity .16s ease; pointer-events: none;
     }
-    #wrap:hover #bar { display: flex; }
+    /* 悬停时中间底部出现的播放控制条 */
+    #ctl {
+      position: absolute; bottom: 2px; left: 50%; transform: translateX(-50%); z-index: 3;
+      background: rgba(0, 0, 0, 0.6); border: 1px solid rgba(255, 255, 255, 0.15);
+      border-radius: 999px; padding: 3px 9px; -webkit-app-region: no-drag;
+      display: flex; opacity: 0; transition: opacity .16s ease; pointer-events: none;
+    }
+    /* JS 控制悬停态：避免用户刚点了按钮就移开 → click 丢失 */
+    #wrap.is-hovering #bar, #wrap.is-hovering #ctl { opacity: 1; pointer-events: auto; }
     .tb { border: none; cursor: pointer; color: #fff; background: transparent;
       font-size: 13px; font-weight: 700; line-height: 1; padding: 3px 6px; border-radius: 5px; }
     .tb:hover { background: rgba(255, 255, 255, 0.18); }
@@ -51,14 +59,6 @@
     .sw:hover { transform: scale(1.15); }
     .sep { width: 1px; height: 14px; background: rgba(255,255,255,.25); margin: 0 2px; }
     #sizev { color: #fff; font-size: 11px; min-width: 24px; text-align: center; -webkit-user-select: none; }
-    /* 悬停时中间底部出现的播放控制条 */
-    #ctl {
-      position: absolute; bottom: 2px; left: 50%; transform: translateX(-50%); z-index: 3;
-      display: none; align-items: center; gap: 4px;
-      background: rgba(0, 0, 0, 0.6); border: 1px solid rgba(255, 255, 255, 0.15);
-      border-radius: 999px; padding: 3px 9px; -webkit-app-region: no-drag;
-    }
-    #wrap:hover #ctl { display: flex; }
     #ctl .tb { font-size: 14px; padding: 3px 7px; }
   </style>
 </head>
@@ -213,6 +213,30 @@
     wPlus.onclick = () => { if (bridge.lyricsWidth) bridge.lyricsWidth((st.width || 920) + 60) }
     // 水平居中（x 方向）
     document.getElementById('center').onclick = () => { if (bridge.lyricsCenter) bridge.lyricsCenter() }
+
+    // --- 悬停控制条：JS 驱动，120ms 离开缓冲，避免 click 丢失 ---
+    let hideTimer = null
+    wrap.addEventListener('pointerenter', () => {
+      if (hideTimer) { clearTimeout(hideTimer); hideTimer = null }
+      wrap.classList.add('is-hovering')
+    })
+    wrap.addEventListener('pointerleave', () => {
+      // 给 click / pointerup 留 120ms 宽限：刚点了按钮就算马上移开，事件不会丢
+      hideTimer = setTimeout(() => { wrap.classList.remove('is-hovering'); hideTimer = null }, 120)
+    })
+    // 鼠标按在按钮上时，按钮元素仍在 DOM 里（只是 opacity 变 0，pointer-events 变 none）。
+    // 但 pointerdown 目标仍然存在，且 button click 会在 pointerleave 之前触发。
+    // 双重保险：按钮按下那一刻立即 cancel 定时器并保持 hovering
+    document.querySelectorAll('#bar, #ctl').forEach(bar => {
+      bar.addEventListener('pointerdown', () => {
+        if (hideTimer) { clearTimeout(hideTimer); hideTimer = null }
+        wrap.classList.add('is-hovering')
+      })
+      bar.addEventListener('click', () => {
+        if (hideTimer) { clearTimeout(hideTimer); hideTimer = null }
+        wrap.classList.add('is-hovering')
+      })
+    })
 
     // 悬停控制条：播放/暂停、上一项、下一项（经主窗口执行）
     const pp = document.getElementById('pp')
