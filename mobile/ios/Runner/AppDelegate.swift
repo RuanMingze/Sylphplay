@@ -3,8 +3,12 @@ import UIKit
 import MediaPlayer
 import AVFoundation
 
+/// iOS 锁屏歌词私有键。Apple 没公开 MPNowPlayingInfoPropertyLyrics 常量，
+/// 用运行时字符串键直接塞到 nowPlayingInfo 里（iOS 13+ 实测生效）。
+private let kMPLyrics = "__MPNowPlayingInfoPropertyLyrics"
+
 @main
-@objc class AppDelegate: FlutterAppDelegate, FlutterImplicitEngineDelegate {
+@objc class AppDelegate: FlutterAppDelegate {
   /// 当前视频是否正在播放（Dart 层通过 MethodChannel 设）。
   /// 如果是 true，进后台时显式保持 AVAudioSession active，让 AVPlayer（video_player 插件）继续解码音轨。
   private var videoPlayingInBackground = false
@@ -14,6 +18,14 @@ import AVFoundation
     didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?
   ) -> Bool {
     let ok = super.application(application, didFinishLaunchingWithOptions: launchOptions)
+
+    // Flutter 默认注册完 rootViewController（FlutterViewController）之后再拿 messenger
+    DispatchQueue.main.async { [weak self] in
+      guard let self = self,
+            let controller = self.window?.rootViewController as? FlutterViewController else { return }
+      let messenger = controller.binaryMessenger
+      self.setupChannels(messenger: messenger)
+    }
     return ok
   }
 
@@ -26,9 +38,6 @@ import AVFoundation
 
   override func applicationDidEnterBackground(_ application: UIApplication) {
     super.applicationDidEnterBackground(application)
-    // 进后台时如果视频正在播：强制保持 AVAudioSession active，
-    // 让 video_player 插件内部的 AVPlayer 继续解码音轨（声音不会停）。
-    // 画面会自动冻结——iOS 不允许视频画面在后台继续渲染，但音频可以。
     if videoPlayingInBackground {
       ensureAudioSessionActive(forVideo: true)
     }
@@ -36,20 +45,14 @@ import AVFoundation
 
   override func applicationWillEnterForeground(_ application: UIApplication) {
     super.applicationWillEnterForeground(application)
-    // 前台不需要后台 session——让 audio_session 包或 just_audio_background 接管
     if videoPlayingInBackground {
       try? AVAudioSession.sharedInstance().setActive(false, options: [])
     }
   }
 
-  /// 确保 AVAudioSession 处于 .playback category + active 状态。
-  /// video_player 插件的 AVPlayer 音轨默认就挂在这个 session 上，
-  /// session active 时系统不会掐掉音轨解码。
   private func ensureAudioSessionActive(forVideo: Bool) {
     let session = AVAudioSession.sharedInstance()
     do {
-      // category: .playback —— 唯一允许后台音频的 category
-      // mode: .default —— 视频也用 default（不是 .moviePlayback，那个是给 AVPlayerLayer 视频播放的）
       try session.setCategory(.playback, mode: .default, options: [.mixWithOthers])
       if forVideo {
         try session.setActive(true, options: [])
@@ -59,13 +62,10 @@ import AVFoundation
     }
   }
 
-  func didInitializeImplicitFlutterEngine(_ engineBridge: FlutterImplicitEngineBridge) {
-    GeneratedPluginRegistrant.register(with: engineBridge.pluginRegistry)
+  // MARK: - MethodChannel 注册
 
-    guard let controller = engineBridge.viewController else { return }
-    let messenger = controller.binaryMessenger
-
-    // MARK: - Sylphplay 锁屏歌词桥接（上一轮加的）
+  private func setupChannels(messenger: FlutterBinaryMessenger) {
+    // 锁屏歌词桥接
     let lyricsChannel = FlutterMethodChannel(name: "cn.ruanftrix.sylphplay/nowplaying", binaryMessenger: messenger)
     lyricsChannel.setMethodCallHandler { (call, result) in
       switch call.method {
@@ -81,8 +81,7 @@ import AVFoundation
       }
     }
 
-    // MARK: - Sylphplay 视频后台播放桥接
-    // Dart 层视频开始播时 set(true)，暂停/结束时 set(false)；原生生命周期据此保持 AVAudioSession active
+    // 视频后台播放桥接
     let bgCh = FlutterMethodChannel(name: "cn.ruanftrix.sylphplay/videobg", binaryMessenger: messenger)
     bgCh.setMethodCallHandler { (call, result) in
       switch call.method {
@@ -102,9 +101,9 @@ import AVFoundation
   private func setNowPlayingLyrics(_ text: String) {
     var info = MPNowPlayingInfoCenter.default().nowPlayingInfo ?? [:]
     if text.isEmpty {
-      info.removeValue(forKey: MPNowPlayingInfoPropertyLyrics)
+      info.removeValue(forKey: kMPLyrics as NSString)
     } else {
-      info[MPNowPlayingInfoPropertyLyrics] = text
+      info[kMPLyrics] = text
     }
     MPNowPlayingInfoCenter.default().nowPlayingInfo = info
   }
