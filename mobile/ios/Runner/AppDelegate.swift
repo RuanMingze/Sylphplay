@@ -19,12 +19,11 @@ private let kMPLyrics = "__MPNowPlayingInfoPropertyLyrics"
   ) -> Bool {
     let ok = super.application(application, didFinishLaunchingWithOptions: launchOptions)
 
-    // Flutter 默认注册完 rootViewController（FlutterViewController）之后再拿 messenger
-    DispatchQueue.main.async { [weak self] in
-      guard let self = self,
-            let controller = self.window?.rootViewController as? FlutterViewController else { return }
-      let messenger = controller.binaryMessenger
-      self.setupChannels(messenger: messenger)
+    // 关键：注册所有 Flutter 原生插件（just_audio / video_player / audio_session 等）
+    // 上轮重构时丢了这行 → 插件没注册 → JustAudioBackground.init() 永远等不到原生响应 → 白屏
+    if let controller = window?.rootViewController as? FlutterViewController {
+      GeneratedPluginRegistrant.register(with: controller.pluginRegistry)
+      setupChannels(messenger: controller.binaryMessenger)
     }
     return ok
   }
