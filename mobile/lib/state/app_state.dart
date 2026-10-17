@@ -626,6 +626,8 @@ class AppState extends ChangeNotifier {
     } catch (_) {}
     _playWithFadeIn(m);
     _endedFired = false;
+    // iOS 视频后台播放桥接：原生据此保持 AVAudioSession active
+    unawaited(setVideoPlayingInBackground(m is VideoHandle));
     notifyListeners();
   }
 
@@ -656,6 +658,8 @@ class AppState extends ChangeNotifier {
         _pausingFade = false;
         await m.pause();
         playing = false;
+        // iOS 视频后台播放桥接：用户手动暂停视频 → 恢复默认 AVAudioSession 行为
+        if (m is VideoHandle) unawaited(setVideoPlayingInBackground(false));
         notifyListeners();
       });
     }
@@ -672,6 +676,8 @@ class AppState extends ChangeNotifier {
       await m.pause();
     } else if (m is VideoHandle) {
       await m.pause();
+      // iOS 视频后台播放桥接：暂停视频 → 恢复默认 AVAudioSession 行为
+      unawaited(setVideoPlayingInBackground(false));
     }
     media = null;
     playing = false;
@@ -880,6 +886,9 @@ class AppState extends ChangeNotifier {
 
   Future<void> _onEnded() async {
     _endedFired = true;
+    // iOS 视频后台播放桥接：视频到终点，先清 flag（循环模式会再置回 true）
+    final wasVideo = media is VideoHandle;
+    if (wasVideo) unawaited(setVideoPlayingInBackground(false));
     // 音频：续播 / 单曲循环 / 列表循环全部由 just_audio 自己按 LoopMode 完成
     // （这样锁屏与 App 内的切歌走同一条路径，不会重复跳曲）；
     // 队列中的下标变化由 _bindPlayerIndex 统一同步回 UI。
@@ -890,6 +899,8 @@ class AppState extends ChangeNotifier {
       await media?.play();
       _endedFired = false;
       playing = true;
+      // 视频单曲循环又回到起播：恢复后台播放桥接
+      if (wasVideo) unawaited(setVideoPlayingInBackground(true));
       notifyListeners();
       return;
     }
