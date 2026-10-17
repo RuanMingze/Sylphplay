@@ -101,7 +101,7 @@ private let kMPLyrics = "__MPNowPlayingInfoPropertyLyrics"
   private func setNowPlayingLyrics(_ text: String) {
     var info = MPNowPlayingInfoCenter.default().nowPlayingInfo ?? [:]
     if text.isEmpty {
-      info.removeValue(forKey: kMPLyrics as NSString)
+      info.removeValue(forKey: kMPLyrics)
     } else {
       info[kMPLyrics] = text
     }
