@@ -17,12 +17,15 @@ private let kMPLyrics = "__MPNowPlayingInfoPropertyLyrics"
     _ application: UIApplication,
     didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?
   ) -> Bool {
+    // 【Flutter 默认模板的正确顺序：先注册插件，再调 super】
+    // FlutterAppDelegate 本身实现了 FlutterPluginRegistry，传 self 就行
+    // 顺序反了 → super 里先创建 FlutterEngine → 插件还没注册 → JustAudioBackground.init() 永远等 → 白屏
+    GeneratedPluginRegistrant.register(with: self)
+
     let ok = super.application(application, didFinishLaunchingWithOptions: launchOptions)
 
-    // 关键：注册所有 Flutter 原生插件（just_audio / video_player / audio_session 等）
-    // 上轮重构时丢了这行 → 插件没注册 → JustAudioBackground.init() 永远等不到原生响应 → 白屏
+    // super 之后 window.rootViewController 才被赋值，拿 messenger 注册自定义 MethodChannel
     if let controller = window?.rootViewController as? FlutterViewController {
-      GeneratedPluginRegistrant.register(with: controller.pluginRegistry())
       setupChannels(messenger: controller.binaryMessenger)
     }
     return ok
