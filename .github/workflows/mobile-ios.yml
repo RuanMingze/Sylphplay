@@ -35,8 +35,6 @@ jobs:
           set -e
           KEYCHAIN="$HOME/Library/Keychains/login.keychain-db"
           PASS='SylphplayCI'
-          # 先解锁 keychain（runner 默认密码是 'runner'，不对也不致命）
-          security unlock-keychain -p "runner" "$KEYCHAIN" 2>/dev/null || true
           CERT_PEM="$GITHUB_WORKSPACE/.github/certs/sylphplay-ci.cert.pem"
           P12="$GITHUB_WORKSPACE/.github/certs/sylphplay-ci.p12"
           test -f "$P12" || { echo "ERROR: p12 not found at $P12"; ls -la "$GITHUB_WORKSPACE/.github/certs/"; exit 1; }
@@ -44,10 +42,8 @@ jobs:
           security find-certificate -a -c "Sylphplay CI AdHoc" -Z 2>/dev/null \
             | awk -F'"' '/SHA-1 hash/{print $2}' \
             | xargs -I{} security delete-certificate -Z {} 2>/dev/null || true
+          # -A 授权所有应用访问，等价于 set-key-partition-list，且无需钥匙串密码
           security import "$P12" -P "$PASS" -A -k "$KEYCHAIN"
-          security set-key-partition-list \
-            -S apple-tool:,apple:,codesign: \
-            -k "runner" "$KEYCHAIN"
           security add-trusted-cert -d -r trustRoot -k "$KEYCHAIN" "$CERT_PEM" 2>/dev/null || true
           echo "cert imported"
 
