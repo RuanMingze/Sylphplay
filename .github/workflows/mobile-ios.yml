@@ -42,9 +42,9 @@ jobs:
           security find-certificate -a -c "Sylphplay CI AdHoc" -Z 2>/dev/null \
             | awk -F'"' '/SHA-1 hash/{print $2}' \
             | xargs -I{} security delete-certificate -Z {} 2>/dev/null || true
-          # -A 授权所有应用访问，等价于 set-key-partition-list，且无需钥匙串密码
+          # -A 授权所有应用访问，无需钥匙串密码
           security import "$P12" -P "$PASS" -A -k "$KEYCHAIN"
-          security add-trusted-cert -d -r trustRoot -k "$KEYCHAIN" "$CERT_PEM" 2>/dev/null || true
+          # add-trusted-cert 也需要钥匙串密码（runner 上未知），且 --no-codesign 根本不校验 trust
           echo "cert imported"
 
       - name: Stub signing team
