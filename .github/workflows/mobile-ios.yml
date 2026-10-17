@@ -35,19 +35,23 @@ jobs:
           set -e
           KEYCHAIN="$HOME/Library/Keychains/login.keychain-db"
           PASS='SylphplayCI'
-          # 用绝对路径避免 runner bash 工作目录解析漂移
+          # macOS runner 的 login keychain 默认密码就是 'runner'
+          RUNNER_KEY='runner'
           CERT_PEM="$GITHUB_WORKSPACE/.github/certs/sylphplay-ci.cert.pem"
           P12="$GITHUB_WORKSPACE/.github/certs/sylphplay-ci.p12"
           test -f "$P12" || { echo "ERROR: p12 not found at $P12"; ls -la "$GITHUB_WORKSPACE/.github/certs/"; exit 1; }
-          # 若 keychain 里已有同名证书（上轮 workflow 残留）则先删
+          # 先解锁，防止 security 交互式挂死
+          timeout 15 security unlock-keychain -p "$RUNNER_KEY" "$KEYCHAIN" 2>/dev/null || true
+          # 清上轮残留
           security find-certificate -a -c "Sylphplay CI AdHoc" -Z 2>/dev/null \
             | awk -F'"' '/SHA-1 hash/{print $2}' \
-            | xargs -I{} security delete-certificate -Z {} 2>/dev/null || true
-          security import "$P12" -P "$PASS" -A -k "$KEYCHAIN"
-          security set-key-partition-list \
+            | xargs -I{} timeout 15 security delete-certificate -Z {} 2>/dev/null || true
+          timeout 15 security import "$P12" -P "$PASS" -A -k "$KEYCHAIN"
+          # -k 必须传 keychain 解锁密码，空密码在 runner 上会挂
+          timeout 15 security set-key-partition-list \
             -S apple-tool:,apple:,codesign: \
-            -k "" "$KEYCHAIN" 2>/dev/null || true
-          security add-trusted-cert -d -r trustRoot -k "$KEYCHAIN" "$CERT_PEM" 2>/dev/null || true
+            -k "$RUNNER_KEY" "$KEYCHAIN"
+          timeout 15 security add-trusted-cert -d -r trustRoot -k "$KEYCHAIN" "$CERT_PEM" 2>/dev/null || true
           echo "cert imported"
 
       - name: Stub signing team
